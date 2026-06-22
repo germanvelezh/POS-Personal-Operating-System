@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
+    "vercel:build": "cd ../.. && npm install && npm --prefix apps/web run build && mkdir -p apps/server/apps/web && cp -R apps/web/dist apps/server/apps/web/",
     "start": "node dist/index.js",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",

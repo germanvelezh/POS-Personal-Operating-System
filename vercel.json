@@ -3,7 +3,7 @@
   "version": 2,
   "framework": "vite",
   "installCommand": "npm install",
-  "buildCommand": "npm run build --workspace apps/web",
+  "buildCommand": "npm run vercel:build",
   "outputDirectory": "apps/web/dist",
   "rewrites": [
     {

@@ -35,11 +35,16 @@ Configuracion esperada en Vercel:
 
 ```text
 Framework Preset: Vite
-Root Directory: ./
+Root Directory: ./  (la raiz del repo, no apps/web ni apps/server)
 Install Command: npm install
-Build Command: npm run build --workspace apps/web
+Build Command: npm run vercel:build
 Output Directory: apps/web/dist
 ```
+
+Importante: este repo se debe importar como un proyecto Vercel desde la raiz.
+Si Vercel queda apuntando a `apps/web`, `npm` no vera los workspaces. Si queda
+apuntando a `apps/server`, Vercel lo detectara como Express y no publicara el
+frontend Vite correctamente.
 
 El archivo `vercel.json` ya deja configurado:
 

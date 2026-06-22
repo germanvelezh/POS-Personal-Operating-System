@@ -1,0 +1,25 @@
+{
+  "name": "startup-os-personal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local personal operating system for German backed by Google Workspace.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c green,blue \"npm run dev --workspace apps/server\" \"npm run dev --workspace apps/web\"",
+    "build:web": "npm run build --workspace apps/web",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "typecheck": "npm run typecheck --workspaces && npm run typecheck:api",
+    "typecheck:api": "tsc -p tsconfig.api.json --noEmit",
+    "lint": "npm run lint --workspaces",
+    "deploy:preview": "npx vercel@latest deploy -y"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

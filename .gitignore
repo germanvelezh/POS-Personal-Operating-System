@@ -1,0 +1,12 @@
+.DS_Store
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+.startup-os/
+.startup-os-cache/
+apps/**/.vite/
+apps/**/dist/
+apps/**/*.tsbuildinfo
+apps/**/*.d.ts

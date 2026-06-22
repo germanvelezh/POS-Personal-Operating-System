@@ -1,12 +1,57 @@
-import { X } from 'lucide-react';
+import {
+  BriefcaseBusiness,
+  CheckSquare,
+  FileText,
+  Lightbulb,
+  ReceiptText,
+  Target,
+  UserRound,
+  X
+} from 'lucide-react';
 
 const quickCreateActions = [
-  'Nueva idea',
-  'Nuevo cliente',
-  'Nuevo proyecto',
-  'Nueva tarea',
-  'Nueva oportunidad',
-  'Nueva factura'
+  {
+    label: 'Nueva idea',
+    detail: 'Captura hipótesis, score y próxima acción.',
+    icon: Lightbulb,
+    tone: 'amber'
+  },
+  {
+    label: 'Nuevo cliente',
+    detail: 'Crea ficha 360 y carpeta Drive.',
+    icon: UserRound,
+    tone: 'blue'
+  },
+  {
+    label: 'Nuevo proyecto',
+    detail: 'Define owner, semáforo y entregables.',
+    icon: BriefcaseBusiness,
+    tone: 'green'
+  },
+  {
+    label: 'Nueva tarea',
+    detail: 'Asigna prioridad, fecha y proyecto.',
+    icon: CheckSquare,
+    tone: 'neutral'
+  },
+  {
+    label: 'Nueva oportunidad',
+    detail: 'Agrega etapa, valor y siguiente paso.',
+    icon: Target,
+    tone: 'purple'
+  },
+  {
+    label: 'Nueva factura',
+    detail: 'Prepara documento y seguimiento.',
+    icon: ReceiptText,
+    tone: 'red'
+  },
+  {
+    label: 'Nuevo documento',
+    detail: 'Brief, investigación o reporte semanal.',
+    icon: FileText,
+    tone: 'blue'
+  }
 ];
 
 type QuickCreateModalProps = {
@@ -30,7 +75,7 @@ export function QuickCreateModal({ open, onClose }: QuickCreateModalProps) {
         <div className="modal-header">
           <div>
             <h2>Crear rápido</h2>
-            <p>Captura el objeto y conéctalo a Google Workspace en las siguientes fases.</p>
+            <p>Captura en segundos. Quedará listo para conectarse a Google Workspace.</p>
           </div>
           <button
             aria-label="Cerrar modal"
@@ -43,11 +88,25 @@ export function QuickCreateModal({ open, onClose }: QuickCreateModalProps) {
         </div>
 
         <div className="quick-grid">
-          {quickCreateActions.map((action) => (
-            <button className="quick-action" key={action} type="button">
-              {action}
+          {quickCreateActions.map((action) => {
+            const Icon = action.icon;
+
+            return (
+            <button
+              className={`quick-action quick-action-${action.tone}`}
+              key={action.label}
+              type="button"
+            >
+              <span className="quick-action-icon">
+                <Icon aria-hidden="true" size={18} strokeWidth={2} />
+              </span>
+              <span>
+                <strong>{action.label}</strong>
+                <small>{action.detail}</small>
+              </span>
             </button>
-          ))}
+            );
+          })}
         </div>
       </section>
     </div>

@@ -1,10 +1,18 @@
-type BadgeTone = 'neutral' | 'success' | 'warning' | 'danger';
+import type { ReactNode } from 'react';
+
+type BadgeTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info';
 
 type BadgeProps = {
-  children: string;
+  children: ReactNode;
+  dot?: boolean;
   tone?: BadgeTone;
 };
 
-export function Badge({ children, tone = 'neutral' }: BadgeProps) {
-  return <span className={`badge badge-${tone}`}>{children}</span>;
+export function Badge({ children, dot = false, tone = 'neutral' }: BadgeProps) {
+  return (
+    <span className={`badge badge-${tone}`}>
+      {dot ? <i aria-hidden="true" className="badge-dot" /> : null}
+      {children}
+    </span>
+  );
 }

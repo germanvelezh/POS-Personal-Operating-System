@@ -1,21 +1,34 @@
+import type { LucideIcon } from 'lucide-react';
+
 type MetricCardProps = {
+  icon?: LucideIcon;
   label: string;
-  value: string;
   detail: string;
+  trend?: 'up' | 'down' | 'flat';
   tone?: 'blue' | 'green' | 'amber' | 'red' | 'neutral';
+  value: string;
 };
 
 export function MetricCard({
+  icon: Icon,
   label,
-  value,
   detail,
-  tone = 'neutral'
+  tone = 'neutral',
+  trend = 'flat',
+  value
 }: MetricCardProps) {
   return (
     <article className={`metric-card metric-${tone}`}>
-      <p>{label}</p>
+      <div className="metric-card-header">
+        {Icon ? (
+          <span className="metric-icon" aria-hidden="true">
+            <Icon size={17} strokeWidth={2} />
+          </span>
+        ) : null}
+        <p>{label}</p>
+      </div>
       <strong>{value}</strong>
-      <span>{detail}</span>
+      <span className={`metric-detail metric-trend-${trend}`}>{detail}</span>
     </article>
   );
 }

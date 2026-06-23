@@ -1,51 +1,119 @@
 import {
   CheckCircle2,
+  Cloud,
   CloudOff,
   FileKey2,
   FolderRoot,
+  LogOut,
   Play,
   Settings2,
   Sheet,
   TriangleAlert
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 
-import { Badge } from '../components/ui/Badge';
+import type { AppOutletContext } from '../components/layout/AppLayout';
+import { Badge, type BadgeTone } from '../components/ui/Badge';
+import { logoutGoogleAuth } from '../services/googleAuth';
 
-const setupSections = [
+type SetupSection = {
+  label: string;
+  detail: string;
+  icon: LucideIcon;
+  tone: BadgeTone;
+};
+
+const setupSections: SetupSection[] = [
   {
     label: 'Estado de conexión Google',
     detail: 'OAuth web server flow pendiente para producción en Vercel.',
     icon: CloudOff,
-    tone: 'warning' as const
+    tone: 'warning'
   },
   {
     label: 'Google Sheet maestro',
     detail: 'Repositorio canónico de clientes, ideas, proyectos y facturas.',
     icon: Sheet,
-    tone: 'neutral' as const
+    tone: 'neutral'
   },
   {
     label: 'Carpeta raíz Drive',
     detail: 'Estructura /Startup OS con carpetas por cliente y proyecto.',
     icon: FolderRoot,
-    tone: 'neutral' as const
+    tone: 'neutral'
   },
   {
     label: 'IDs de plantillas Docs',
     detail: 'Briefs, investigaciones, facturas y reportes semanales.',
     icon: FileKey2,
-    tone: 'neutral' as const
+    tone: 'neutral'
   }
 ];
 
 const diagnostics = [
   ['Frontend', 'Listo para Vercel'],
   ['API health', 'Disponible'],
-  ['OAuth callback', 'Pendiente de credenciales'],
   ['Persistencia', 'Google Sheets']
 ];
 
 export function SettingsPage() {
+  const { googleStatus, googleStatusLoading, refreshGoogleStatus } =
+    useOutletContext<AppOutletContext>();
+  const [logoutPending, setLogoutPending] = useState(false);
+  const googleConnected = googleStatus.connected;
+  const googleConfigured = googleStatus.configured;
+  const googleBadgeTone: BadgeTone = googleStatusLoading
+    ? 'neutral'
+    : googleConnected
+      ? 'success'
+      : googleConfigured
+        ? 'warning'
+        : 'danger';
+  const googleBadgeLabel = googleStatusLoading
+    ? 'Verificando'
+    : googleConnected
+      ? 'Google conectado'
+      : googleConfigured
+        ? 'Google pendiente'
+        : 'Google sin configurar';
+  const ConnectionIcon = googleConnected ? Cloud : TriangleAlert;
+  const connectionTitle = googleConnected ? 'Google conectado' : 'Google no conectado';
+  const connectionDescription = googleConnected
+    ? `Sesión autorizada para ${googleStatus.email}. Ya podemos avanzar hacia Sheets, Drive y Docs.`
+    : googleConfigured
+      ? 'OAuth está configurado. Conecta la cuenta autorizada para habilitar Sheets, Drive y Docs.'
+      : 'Faltan variables de entorno OAuth en Vercel o en el entorno local.';
+  const setupRows = setupSections.map((section) =>
+    section.label === 'Estado de conexión Google'
+      ? {
+          ...section,
+          detail: googleConnected
+            ? `Autorizado como ${googleStatus.email}.`
+            : 'OAuth web server flow pendiente de conexión.',
+          icon: googleConnected ? Cloud : CloudOff,
+          tone: googleBadgeTone
+        }
+      : section
+  );
+  const diagnosticsRows = [
+    ...diagnostics,
+    ['OAuth callback', googleConfigured ? 'Configurado' : 'Pendiente de variables'],
+    ['Email autorizado', googleStatus.allowedGoogleEmail ?? 'Pendiente']
+  ];
+
+  async function handleLogout() {
+    setLogoutPending(true);
+
+    try {
+      await logoutGoogleAuth();
+      await refreshGoogleStatus();
+    } finally {
+      setLogoutPending(false);
+    }
+  }
+
   return (
     <section className="module-page settings-page">
       <div className="module-hero">
@@ -59,11 +127,11 @@ export function SettingsPage() {
           </div>
         </div>
         <div className="module-actions">
-          <Badge dot tone="warning">Google pendiente</Badge>
-          <button className="button button-secondary" type="button">
+          <Badge dot tone={googleBadgeTone}>{googleBadgeLabel}</Badge>
+          <a className="button button-secondary" href="/auth/google">
             <CloudOff aria-hidden="true" size={15} />
-            Conectar Google
-          </button>
+            {googleConnected ? 'Reconectar Google' : 'Conectar Google'}
+          </a>
           <button className="button button-primary" type="button">
             <Play aria-hidden="true" size={14} />
             Inicializar sistema
@@ -74,24 +142,31 @@ export function SettingsPage() {
       <div className="settings-grid">
         <article className="panel settings-connection">
           <div className="connection-hero">
-            <span className="connection-icon">
-              <TriangleAlert aria-hidden="true" size={22} />
+            <span
+              className={`connection-icon ${googleConnected ? 'connection-icon-success' : ''}`}
+            >
+              <ConnectionIcon aria-hidden="true" size={22} />
             </span>
             <div>
-              <h2>Google no conectado</h2>
-              <p>
-                Cuando OAuth esté configurado, esta sección validará Sheets, Drive,
-                Docs y el email autorizado de Germán.
-              </p>
+              <h2>{connectionTitle}</h2>
+              <p>{connectionDescription}</p>
             </div>
           </div>
           <div className="settings-actions">
-            <button className="button button-primary" type="button">
-              Conectar Google
-            </button>
-            <button className="button button-secondary" type="button">
-              Ver variables Vercel
-            </button>
+            <a className="button button-primary" href="/auth/google">
+              {googleConnected ? 'Renovar permisos' : 'Conectar Google'}
+            </a>
+            {googleConnected ? (
+              <button
+                className="button button-secondary"
+                disabled={logoutPending}
+                onClick={handleLogout}
+                type="button"
+              >
+                <LogOut aria-hidden="true" size={15} />
+                Desconectar
+              </button>
+            ) : null}
           </div>
         </article>
 
@@ -104,7 +179,7 @@ export function SettingsPage() {
             <Badge tone="warning">Pendiente</Badge>
           </div>
           <div className="setup-list">
-            {setupSections.map((section) => {
+            {setupRows.map((section) => {
               const Icon = section.icon;
 
               return (
@@ -132,7 +207,7 @@ export function SettingsPage() {
             <CheckCircle2 aria-hidden="true" size={18} />
           </div>
           <div className="settings-list">
-            {diagnostics.map(([label, value]) => (
+            {diagnosticsRows.map(([label, value]) => (
               <div className="settings-row" key={label}>
                 <span>{label}</span>
                 <strong>{value}</strong>

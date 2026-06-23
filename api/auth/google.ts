@@ -1,11 +1,18 @@
-type JsonResponse = {
-  status: (code: number) => JsonResponse;
-  json: (body: unknown) => void;
+import { buildGoogleAuthRedirect } from '../../apps/server/src/auth/oauth';
+
+type RedirectResponse = {
+  setHeader: (name: string, value: string | string[]) => void;
+  status: (code: number) => RedirectResponse;
+  end: () => void;
 };
 
-export default function handler(_request: unknown, response: JsonResponse) {
-  response.status(501).json({
-    status: 'not_implemented',
-    message: 'Google OAuth starts in Phase 1. Configure Vercel env vars first.'
-  });
+export default function handler(_request: unknown, response: RedirectResponse) {
+  const redirect = buildGoogleAuthRedirect(process.env);
+
+  if (redirect.setCookie) {
+    response.setHeader('Set-Cookie', redirect.setCookie);
+  }
+
+  response.setHeader('Location', redirect.location);
+  response.status(redirect.status).end();
 }

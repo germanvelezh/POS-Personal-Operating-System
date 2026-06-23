@@ -1,11 +1,29 @@
-type JsonResponse = {
-  status: (code: number) => JsonResponse;
-  json: (body: unknown) => void;
+import { buildGoogleCallbackRedirect } from '../../apps/server/src/auth/oauth';
+
+type CallbackRequest = {
+  query?: Record<string, string | string[] | undefined>;
+  headers?: {
+    cookie?: string;
+  };
 };
 
-export default function handler(_request: unknown, response: JsonResponse) {
-  response.status(501).json({
-    status: 'not_implemented',
-    message: 'Google OAuth callback starts in Phase 1. Use this path as the Vercel redirect URI.'
-  });
+type RedirectResponse = {
+  setHeader: (name: string, value: string | string[]) => void;
+  status: (code: number) => RedirectResponse;
+  end: () => void;
+};
+
+export default async function handler(request: CallbackRequest, response: RedirectResponse) {
+  const redirect = await buildGoogleCallbackRedirect(
+    request.query ?? {},
+    request.headers?.cookie,
+    process.env
+  );
+
+  if (redirect.setCookie) {
+    response.setHeader('Set-Cookie', redirect.setCookie);
+  }
+
+  response.setHeader('Location', redirect.location);
+  response.status(redirect.status).end();
 }

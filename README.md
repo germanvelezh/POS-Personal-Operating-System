@@ -61,11 +61,13 @@ El archivo `vercel.json` ya deja configurado:
 En Vercel, crea estas variables en Project Settings > Environment Variables:
 
 ```env
-APP_BASE_URL=https://tu-proyecto.vercel.app
-PUBLIC_APP_URL=https://tu-proyecto.vercel.app
+APP_BASE_URL=https://pos-personal-operating-system-serve.vercel.app
+PUBLIC_APP_URL=https://pos-personal-operating-system-serve.vercel.app
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=https://tu-proyecto.vercel.app/auth/google/callback
+GOOGLE_REDIRECT_URI=https://pos-personal-operating-system-serve.vercel.app/auth/google/callback
+SESSION_SECRET=
+ALLOWED_GOOGLE_EMAIL=germanvelezh@gmail.com
 GOOGLE_MASTER_SHEET_ID=
 GOOGLE_ROOT_DRIVE_FOLDER_ID=
 GOOGLE_TEMPLATE_ID_IDEA_BRIEF=
@@ -83,13 +85,32 @@ En Google Cloud Console, agrega tambien estos valores al OAuth Client:
 
 ```text
 Authorized JavaScript origins:
-https://tu-proyecto.vercel.app
+https://pos-personal-operating-system-serve.vercel.app
+http://localhost:5173
 
 Authorized redirect URIs:
-https://tu-proyecto.vercel.app/auth/google/callback
+https://pos-personal-operating-system-serve.vercel.app/auth/google/callback
+http://localhost:5174/auth/google/callback
 ```
 
 Si usas un dominio propio, usa ese dominio en vez del `vercel.app`.
+
+Genera `SESSION_SECRET` con:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+No agregues `GOOGLE_CLIENT_SECRET` ni `SESSION_SECRET` como variables `VITE_*`;
+esas variables quedan expuestas al navegador.
+
+### OAuth implementado
+
+- `GET /auth/google` inicia el flujo Google OAuth.
+- `GET /auth/google/callback` procesa el callback, valida
+  `ALLOWED_GOOGLE_EMAIL` y guarda una sesion cifrada en cookie `HttpOnly`.
+- `GET /api/auth/status` devuelve si Google esta configurado/conectado.
+- `POST /api/auth/logout` borra la cookie local de sesion.
 
 ## Scripts
 
@@ -104,6 +125,6 @@ npm run deploy:preview
 
 ## Fase actual
 
-Fase 0 crea la estructura base, `/api/health`, el shell inicial de la app, el
-dashboard ejecutivo vacio y configuracion base para Vercel. La conexion real
-con Google OAuth, Sheets, Drive y Docs empieza en Fase 1.
+Fase 0 esta completa. La app ya tiene `/api/health`, shell ejecutivo, build de
+Vercel y OAuth Google base para Fase 1A. El siguiente bloque es inicializar
+Sheets/Drive/Docs y crear la hoja maestra con headers.

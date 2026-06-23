@@ -306,10 +306,28 @@ a:focus-visible {
   white-space: nowrap;
 }
 
+.connection-state small {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
 .connection-state i {
   width: 8px;
   height: 8px;
   border-radius: 999px;
+  background: var(--border-strong);
+}
+
+.connection-state-success i {
+  background: var(--green);
+}
+
+.connection-state-warning i {
+  background: var(--amber);
+}
+
+.connection-state-danger i {
   background: var(--red);
 }
 
@@ -339,7 +357,14 @@ a:focus-visible {
   border: 1px solid transparent;
   padding: 0 13px;
   font-size: 0.86rem;
+  text-decoration: none;
   white-space: nowrap;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none;
 }
 
 .button:hover,
@@ -1029,6 +1054,11 @@ a:focus-visible {
   border-radius: 8px;
   background: var(--amber-soft);
   color: var(--amber);
+}
+
+.connection-icon-success {
+  background: var(--green-soft);
+  color: var(--green);
 }
 
 .connection-hero h2 {

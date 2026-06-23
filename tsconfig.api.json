@@ -13,6 +13,7 @@
   },
   "include": [
     "api/**/*.ts",
+    "apps/server/api/**/*.ts",
     "apps/server/src/auth/**/*.ts",
     "apps/server/src/utils/**/*.ts"
   ]

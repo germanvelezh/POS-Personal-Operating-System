@@ -1,4 +1,4 @@
-import { getGoogleConnectionStatus } from '../../src/auth/status';
+import { getGoogleConnectionStatus } from '../../src/auth/status.js';
 
 type StatusRequest = {
   headers?: {

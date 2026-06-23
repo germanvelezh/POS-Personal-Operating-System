@@ -1,4 +1,4 @@
-import { buildGoogleCallbackRedirect } from '../../src/auth/oauth';
+import { buildGoogleCallbackRedirect } from '../../src/auth/oauth.js';
 
 type CallbackRequest = {
   query?: Record<string, string | string[] | undefined>;

@@ -1,4 +1,4 @@
-import { buildGoogleLogoutResponse } from '../../src/auth/oauth';
+import { buildGoogleLogoutResponse } from '../../src/auth/oauth.js';
 
 type LogoutRequest = {
   method?: string;

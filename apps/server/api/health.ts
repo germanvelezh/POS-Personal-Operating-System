@@ -1,4 +1,4 @@
-import { createHealthPayload } from '../src/utils/health';
+import { createHealthPayload } from '../src/utils/health.js';
 
 type JsonResponse = {
   status: (code: number) => JsonResponse;

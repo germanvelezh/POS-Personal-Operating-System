@@ -1,4 +1,4 @@
-import { buildGoogleAuthRedirect } from '../../src/auth/oauth';
+import { buildGoogleAuthRedirect } from '../../src/auth/oauth.js';
 
 type RedirectResponse = {
   setHeader: (name: string, value: string | string[]) => void;

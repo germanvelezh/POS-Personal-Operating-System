@@ -125,6 +125,13 @@ npm run deploy:preview
 
 ## Fase actual
 
-Fase 0 esta completa. La app ya tiene `/api/health`, shell ejecutivo, build de
-Vercel y OAuth Google base para Fase 1A. El siguiente bloque es inicializar
-Sheets/Drive/Docs y crear la hoja maestra con headers.
+Fase 2 esta en progreso/completada a nivel backend base. La app ya tiene:
+
+- Fase 0: shell ejecutivo, `/api/health`, build local y build Vercel.
+- Fase 1: OAuth Google en Vercel e inicializacion de Google Workspace desde
+  `/settings`.
+- Fase 2: schemas Zod, generacion de IDs, mapeo fila Sheets, repositorio
+  generico y fabrica de repositorios para las 20 hojas canonicas.
+
+El siguiente bloque es Fase 3: APIs CRUD y UI operativa para clientes, ideas,
+proyectos, tareas, oportunidades y facturas.

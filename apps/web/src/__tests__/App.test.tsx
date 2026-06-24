@@ -26,6 +26,7 @@ describe('Startup OS Personal shell', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    window.history.pushState({}, '', '/');
   });
 
   it('renders the executive cockpit navigation and setup actions', async () => {
@@ -72,7 +73,7 @@ describe('Startup OS Personal shell', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Google conectado')).toBeInTheDocument();
+    expect((await screen.findAllByText('Google conectado')).length).toBeGreaterThan(0);
     expect(screen.getByText('germanvelezh@gmail.com')).toBeInTheDocument();
   });
 
@@ -92,5 +93,80 @@ describe('Startup OS Personal shell', () => {
     expect(screen.getByRole('button', { name: /Nueva factura/i })).toBeInTheDocument();
     expect(screen.getByText(/Captura en segundos/i)).toBeInTheDocument();
     expect(screen.getByText(/Quedará listo para conectarse a Google Workspace/i)).toBeInTheDocument();
+  });
+
+  it('initializes Google Workspace from settings', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url === '/api/auth/status') {
+        return {
+          ok: true,
+          json: async () => ({
+            configured: true,
+            connected: true,
+            email: 'germanvelezh@gmail.com',
+            name: 'German Velez',
+            picture: null,
+            allowedGoogleEmail: 'germanvelezh@gmail.com'
+          })
+        };
+      }
+
+      if (url === '/api/setup/initialize') {
+        expect(init).toMatchObject({
+          credentials: 'include',
+          method: 'POST'
+        });
+
+        return {
+          ok: true,
+          json: async () => ({
+            initialized: true,
+            rootFolderId: 'folder-1',
+            rootFolderUrl: 'https://drive.google.com/drive/folders/folder-1',
+            masterSheetId: 'sheet-1',
+            masterSheetUrl: 'https://docs.google.com/spreadsheets/d/sheet-1/edit',
+            internalClientId: 'CLI-20260623-A1B2',
+            created: {
+              rootFolder: true,
+              masterSheet: true,
+              internalClient: true
+            },
+            sheets: {
+              createdSheets: ['Clientes'],
+              headersWritten: ['Clientes'],
+              renamedDefaultSheet: true
+            }
+          })
+        };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    window.history.pushState({}, '', '/settings');
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Google conectado' })).toBeInTheDocument();
+    const initializeButton = screen.getAllByRole('button', {
+      name: /Inicializar sistema/i
+    })[0];
+
+    expect(initializeButton).toBeDefined();
+    await user.click(initializeButton as HTMLElement);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/setup/initialize',
+      expect.objectContaining({
+        credentials: 'include',
+        method: 'POST'
+      })
+    );
+    expect((await screen.findAllByText('Sistema inicializado')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('sheet-1').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('folder-1').length).toBeGreaterThan(0);
   });
 });

@@ -2,6 +2,7 @@ import {
   CheckCircle2,
   Cloud,
   CloudOff,
+  ExternalLink,
   FileKey2,
   FolderRoot,
   LogOut,
@@ -28,7 +29,7 @@ type SetupSection = {
 const setupSections: SetupSection[] = [
   {
     label: 'Estado de conexión Google',
-    detail: 'OAuth web server flow pendiente para producción en Vercel.',
+    detail: 'OAuth web server flow listo para producción en Vercel.',
     icon: CloudOff,
     tone: 'warning'
   },
@@ -59,7 +60,15 @@ const diagnostics = [
 ];
 
 export function SettingsPage() {
-  const { googleStatus, googleStatusLoading, refreshGoogleStatus } =
+  const {
+    googleStatus,
+    googleStatusLoading,
+    initializeSystem,
+    refreshGoogleStatus,
+    setupError,
+    setupPending,
+    setupResult
+  } =
     useOutletContext<AppOutletContext>();
   const [logoutPending, setLogoutPending] = useState(false);
   const googleConnected = googleStatus.connected;
@@ -85,22 +94,47 @@ export function SettingsPage() {
     : googleConfigured
       ? 'OAuth está configurado. Conecta la cuenta autorizada para habilitar Sheets, Drive y Docs.'
       : 'Faltan variables de entorno OAuth en Vercel o en el entorno local.';
-  const setupRows = setupSections.map((section) =>
-    section.label === 'Estado de conexión Google'
+  const setupRows = setupSections.map((section) => ({
+    ...section,
+    ...(section.label === 'Estado de conexión Google'
       ? {
-          ...section,
           detail: googleConnected
             ? `Autorizado como ${googleStatus.email}.`
             : 'OAuth web server flow pendiente de conexión.',
           icon: googleConnected ? Cloud : CloudOff,
           tone: googleBadgeTone
         }
-      : section
-  );
+      : {}),
+    ...(section.label === 'Google Sheet maestro' && setupResult
+      ? {
+          detail: `Creado o validado: ${setupResult.masterSheetId}.`,
+          tone: 'success' as BadgeTone
+        }
+      : {}),
+    ...(section.label === 'Carpeta raíz Drive' && setupResult
+      ? {
+          detail: `Creada o validada: ${setupResult.rootFolderId}.`,
+          tone: 'success' as BadgeTone
+        }
+      : {})
+  }));
+  const setupComplete = Boolean(setupResult?.initialized);
+  const setupBadgeTone: BadgeTone = setupPending
+    ? 'info'
+    : setupComplete
+      ? 'success'
+      : 'warning';
+  const setupBadgeLabel = setupPending
+    ? 'Inicializando'
+    : setupComplete
+      ? 'Sistema inicializado'
+      : 'Pendiente';
   const diagnosticsRows = [
     ...diagnostics,
     ['OAuth callback', googleConfigured ? 'Configurado' : 'Pendiente de variables'],
-    ['Email autorizado', googleStatus.allowedGoogleEmail ?? 'Pendiente']
+    ['Email autorizado', googleStatus.allowedGoogleEmail ?? 'Pendiente'],
+    ['Sheet maestro', setupResult?.masterSheetId ?? 'Pendiente'],
+    ['Carpeta Drive', setupResult?.rootFolderId ?? 'Pendiente']
   ];
 
   async function handleLogout() {
@@ -112,6 +146,10 @@ export function SettingsPage() {
     } finally {
       setLogoutPending(false);
     }
+  }
+
+  function handleInitialize() {
+    void initializeSystem();
   }
 
   return (
@@ -132,9 +170,14 @@ export function SettingsPage() {
             <CloudOff aria-hidden="true" size={15} />
             {googleConnected ? 'Reconectar Google' : 'Conectar Google'}
           </a>
-          <button className="button button-primary" type="button">
+          <button
+            className="button button-primary"
+            disabled={!googleConnected || setupPending}
+            onClick={handleInitialize}
+            type="button"
+          >
             <Play aria-hidden="true" size={14} />
-            Inicializar sistema
+            {setupPending ? 'Inicializando' : 'Inicializar sistema'}
           </button>
         </div>
       </div>
@@ -176,11 +219,21 @@ export function SettingsPage() {
               <h2>Inicialización</h2>
               <p>Secuencia que creará hojas, headers, cliente interno y carpetas.</p>
             </div>
-            <Badge tone="warning">Pendiente</Badge>
+            <Badge tone={setupBadgeTone}>{setupBadgeLabel}</Badge>
           </div>
+          {setupError ? (
+            <div className="settings-alert" role="alert">
+              <TriangleAlert aria-hidden="true" size={16} />
+              <span>{setupError}</span>
+            </div>
+          ) : null}
           <div className="setup-list">
             {setupRows.map((section) => {
               const Icon = section.icon;
+              const rowReady =
+                (section.label === 'Estado de conexión Google' && googleConnected) ||
+                (section.label === 'Google Sheet maestro' && setupComplete) ||
+                (section.label === 'Carpeta raíz Drive' && setupComplete);
 
               return (
                 <div className="setup-row" key={section.label}>
@@ -191,11 +244,48 @@ export function SettingsPage() {
                     <strong>{section.label}</strong>
                     <small>{section.detail}</small>
                   </div>
-                  <Badge tone={section.tone}>Pendiente</Badge>
+                  <Badge tone={rowReady ? 'success' : section.tone}>
+                    {rowReady ? 'Listo' : 'Pendiente'}
+                  </Badge>
                 </div>
               );
             })}
           </div>
+          {setupResult ? (
+            <div className="setup-result">
+              <div className="setup-result-header">
+                <CheckCircle2 aria-hidden="true" size={18} />
+                <div>
+                  <strong>Sistema inicializado</strong>
+                  <span>Google Workspace quedó listo para usar como backend.</span>
+                </div>
+              </div>
+              <div className="setup-result-grid">
+                <div>
+                  <span>Sheet maestro</span>
+                  <strong>{setupResult.masterSheetId}</strong>
+                  <a href={setupResult.masterSheetUrl} rel="noreferrer" target="_blank">
+                    Abrir Sheet <ExternalLink aria-hidden="true" size={12} />
+                  </a>
+                </div>
+                <div>
+                  <span>Carpeta Drive</span>
+                  <strong>{setupResult.rootFolderId}</strong>
+                  <a href={setupResult.rootFolderUrl} rel="noreferrer" target="_blank">
+                    Abrir Drive <ExternalLink aria-hidden="true" size={12} />
+                  </a>
+                </div>
+                <div>
+                  <span>Cliente interno</span>
+                  <strong>{setupResult.internalClientId}</strong>
+                </div>
+                <div>
+                  <span>Hojas validadas</span>
+                  <strong>{setupResult.sheets.headersWritten.length}</strong>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </article>
 
         <article className="panel">

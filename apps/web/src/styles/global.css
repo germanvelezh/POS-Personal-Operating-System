@@ -367,6 +367,10 @@ a:focus-visible {
   transform: none;
 }
 
+.button:disabled:hover {
+  transform: none;
+}
+
 .button:hover,
 .quick-action:hover,
 .shortcut-grid button:hover,
@@ -1124,6 +1128,94 @@ a:focus-visible {
   color: var(--text-muted);
   font-size: 0.76rem;
   line-height: 1.35;
+}
+
+.settings-alert {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 14px 0 2px;
+  border: 1px solid rgba(220, 38, 38, 0.18);
+  border-radius: 8px;
+  background: var(--red-soft);
+  color: var(--red);
+  padding: 10px 12px;
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.setup-result {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  border: 1px solid rgba(20, 148, 71, 0.18);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff 0%, var(--green-soft) 100%);
+  padding: 14px;
+}
+
+.setup-result-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--green);
+}
+
+.setup-result-header strong,
+.setup-result-header span {
+  display: block;
+}
+
+.setup-result-header strong {
+  color: var(--text);
+  font-size: 0.93rem;
+}
+
+.setup-result-header span {
+  margin-top: 3px;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+}
+
+.setup-result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.setup-result-grid > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  border: 1px solid rgba(20, 148, 71, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 10px;
+}
+
+.setup-result-grid span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 680;
+  text-transform: uppercase;
+}
+
+.setup-result-grid strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setup-result-grid a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--blue);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .ordered-steps {

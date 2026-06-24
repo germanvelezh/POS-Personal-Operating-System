@@ -5,7 +5,9 @@ import type { GoogleAuthStatus } from '../../services/googleAuth';
 type TopbarProps = {
   googleStatus: GoogleAuthStatus;
   googleStatusLoading: boolean;
+  onInitializeSystem: () => Promise<void>;
   onQuickCreate: () => void;
+  setupPending: boolean;
 };
 
 function getConnectionLabel(status: GoogleAuthStatus, loading: boolean) {
@@ -40,9 +42,16 @@ function getConnectionTone(status: GoogleAuthStatus, loading: boolean) {
   return 'connection-state-danger';
 }
 
-export function Topbar({ googleStatus, googleStatusLoading, onQuickCreate }: TopbarProps) {
+export function Topbar({
+  googleStatus,
+  googleStatusLoading,
+  onInitializeSystem,
+  onQuickCreate,
+  setupPending
+}: TopbarProps) {
   const connectionLabel = getConnectionLabel(googleStatus, googleStatusLoading);
   const connectionTone = getConnectionTone(googleStatus, googleStatusLoading);
+  const setupDisabled = googleStatusLoading || !googleStatus.connected || setupPending;
 
   return (
     <header className="topbar">
@@ -67,9 +76,16 @@ export function Topbar({ googleStatus, googleStatusLoading, onQuickCreate }: Top
           <DatabaseZap aria-hidden="true" size={15} />
           {googleStatus.connected ? 'Reconectar Google' : 'Conectar Google'}
         </a>
-        <button className="button button-secondary" type="button">
+        <button
+          className="button button-secondary"
+          disabled={setupDisabled}
+          onClick={() => {
+            void onInitializeSystem();
+          }}
+          type="button"
+        >
           <Play aria-hidden="true" size={14} />
-          Inicializar sistema
+          {setupPending ? 'Inicializando' : 'Inicializar sistema'}
         </button>
         <button
           aria-label="Crear rapido"

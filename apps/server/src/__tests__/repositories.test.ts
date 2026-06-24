@@ -115,6 +115,15 @@ describe('entity configs and schemas', () => {
         fecha_actualizacion: '2026-06-24T00:00:00.000Z'
       })
     ).toThrow();
+
+    expect(() =>
+      entitySchemas.configuration.parse({
+        clave: 'TEMPLATE_IDEA_BRIEF_ID',
+        descripcion: 'Plantilla pendiente de configurar.',
+        fecha_actualizacion: '2026-06-24T00:00:00.000Z',
+        valor: ''
+      })
+    ).not.toThrow();
   });
 
   it('calculates idea priority score from the MVP formula', () => {

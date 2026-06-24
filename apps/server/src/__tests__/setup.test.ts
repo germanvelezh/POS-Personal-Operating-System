@@ -148,7 +148,10 @@ describe('initializeStartupOs', () => {
       expect.arrayContaining([
         expect.objectContaining({ clave: 'MASTER_SHEET_ID', valor: 'sheet-1' }),
         expect.objectContaining({ clave: 'DRIVE_ROOT_FOLDER_ID', valor: 'folder-1' }),
-        expect.objectContaining({ clave: 'CLIENTE_INTERNO_ID', valor: 'CLI-20260623-A1B2' })
+        expect.objectContaining({ clave: 'CLIENTE_INTERNO_ID', valor: 'CLI-20260623-A1B2' }),
+        expect.objectContaining({ clave: 'TEMPLATE_IDEA_BRIEF_ID', valor: '' }),
+        expect.objectContaining({ clave: 'TEMPLATE_PROJECT_BRIEF_ID', valor: '' }),
+        expect.objectContaining({ clave: 'TEMPLATE_INVOICE_ID', valor: '' })
       ])
     );
     expect(result).toMatchObject({

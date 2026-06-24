@@ -2,6 +2,7 @@ import {
   buildEntityCollectionResponse,
   buildEntityItemResponse
 } from '../src/entities/http.js';
+import { createGoogleWorkspaceAdapter } from '../src/workspace/googleWorkspaceAdapter.js';
 
 type ApiRequest = {
   body?: unknown;
@@ -46,7 +47,11 @@ export default async function handler(request: ApiRequest, response: JsonRespons
         entity: entity ?? '',
         method: request.method,
         query: request.query,
-        source: process.env
+        source: process.env,
+        workspaceAdapterFactory:
+          request.method === 'POST'
+            ? async (session, config) => createGoogleWorkspaceAdapter(session, config)
+            : undefined
       });
 
   response.status(payload.status).json(payload.body);

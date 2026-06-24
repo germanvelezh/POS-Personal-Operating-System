@@ -1,7 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { AppLayout } from '../components/layout/AppLayout';
+import { AutomationsPage } from '../pages/AutomationsPage';
 import { DashboardPage } from '../pages/DashboardPage';
+import { DocumentsPage } from '../pages/DocumentsPage';
 import { EntityPage } from '../pages/EntityPage';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
 import { SettingsPage } from '../pages/SettingsPage';
@@ -30,6 +32,10 @@ export function App() {
             const entity = crudRoutes[route.path as keyof typeof crudRoutes];
             const element = entity ? (
               <EntityPage entity={entity} route={route} />
+            ) : route.path === '/documents' ? (
+              <DocumentsPage />
+            ) : route.path === '/automations' ? (
+              <AutomationsPage />
             ) : route.path === '/settings' ? (
               <SettingsPage />
             ) : (

@@ -2,6 +2,8 @@ import {
   AlertTriangle,
   ArrowUpRight,
   ExternalLink,
+  FilePlus2,
+  FolderPlus,
   Loader2,
   Pencil,
   Plus,
@@ -23,6 +25,10 @@ import {
   type EntityKey,
   type EntityRecord
 } from '../services/entities';
+import {
+  runWorkspaceAction,
+  type WorkspaceAction
+} from '../services/workspace';
 
 type FieldType = 'date' | 'email' | 'number' | 'select' | 'tel' | 'text' | 'textarea' | 'url';
 
@@ -56,6 +62,12 @@ type EntityPageConfig = {
   statusField: string;
   titleField: string;
   views: ViewConfig[];
+};
+
+type WorkspaceActionConfig = {
+  action: WorkspaceAction;
+  icon: typeof FilePlus2;
+  label: string;
 };
 
 type EntityPageProps = {
@@ -612,6 +624,55 @@ function filterRecords(
   });
 }
 
+function getWorkspaceActions(entity: EntityKey, record: EntityRecord): WorkspaceActionConfig[] {
+  if (entity === 'clients') {
+    return [
+      {
+        action: 'create_client_folder',
+        icon: FolderPlus,
+        label: record.drive_folder_url ? 'Actualizar carpeta Drive' : 'Crear carpeta Drive'
+      }
+    ];
+  }
+
+  if (entity === 'ideas') {
+    return [
+      {
+        action: 'generate_idea_brief',
+        icon: FilePlus2,
+        label: 'Generar brief'
+      }
+    ];
+  }
+
+  if (entity === 'projects') {
+    return [
+      {
+        action: 'create_project_structure',
+        icon: FolderPlus,
+        label: record.drive_folder_url ? 'Actualizar estructura Drive' : 'Crear estructura Drive'
+      },
+      {
+        action: 'generate_project_brief',
+        icon: FilePlus2,
+        label: 'Generar brief'
+      }
+    ];
+  }
+
+  if (entity === 'invoices') {
+    return [
+      {
+        action: 'generate_invoice',
+        icon: FilePlus2,
+        label: 'Generar factura'
+      }
+    ];
+  }
+
+  return [];
+}
+
 function EntityField({
   field,
   onChange,
@@ -690,6 +751,8 @@ export function EntityPage({ entity, route }: EntityPageProps) {
   const [formValues, setFormValues] = useState<Record<string, string>>(() =>
     createInitialForm(config)
   );
+  const [workspaceAction, setWorkspaceAction] = useState<WorkspaceAction | null>(null);
+  const [workspaceMessage, setWorkspaceMessage] = useState<string | null>(null);
 
   const activeStatus = config.views.find((view) => view.label === activeView)?.status;
   const filteredRecords = useMemo(
@@ -770,6 +833,43 @@ export function EntityPage({ entity, route }: EntityPageProps) {
     setSelectedId(id);
     setFormMode(null);
     navigate(`${route.path}/${id}`);
+  }
+
+  async function handleWorkspaceAction(action: WorkspaceAction) {
+    if (!currentSelectedId) {
+      return;
+    }
+
+    setWorkspaceAction(action);
+    setWorkspaceMessage(null);
+    setError(null);
+
+    try {
+      const result = await runWorkspaceAction({
+        action,
+        entity,
+        id: currentSelectedId
+      });
+
+      if (result.record) {
+        const nextId = recordId(result.record, config);
+
+        setRecords((current) =>
+          current.map((record) =>
+            recordId(record, config) === nextId ? result.record as EntityRecord : record
+          )
+        );
+        setSelectedId(nextId);
+      }
+
+      setWorkspaceMessage(result.document ? 'Documento generado' : 'Drive actualizado');
+    } catch (workspaceError) {
+      setError(
+        workspaceError instanceof Error ? workspaceError.message : 'No se pudo ejecutar la acción.'
+      );
+    } finally {
+      setWorkspaceAction(null);
+    }
   }
 
   function handleRowKeyDown(event: KeyboardEvent<HTMLDivElement>, record: EntityRecord) {
@@ -1062,6 +1162,35 @@ export function EntityPage({ entity, route }: EntityPageProps) {
                     </a>
                   ))}
               </div>
+
+              <div className="entity-workspace-actions">
+                {getWorkspaceActions(entity, selectedRecord).map((item) => {
+                  const ActionIcon = item.icon;
+
+                  return (
+                    <button
+                      className="button button-secondary"
+                      disabled={Boolean(workspaceAction) || saving}
+                      key={item.action}
+                      onClick={() => void handleWorkspaceAction(item.action)}
+                      type="button"
+                    >
+                      {workspaceAction === item.action ? (
+                        <Loader2 aria-hidden="true" className="spin-icon" size={14} />
+                      ) : (
+                        <ActionIcon aria-hidden="true" size={14} />
+                      )}
+                      {workspaceAction === item.action ? 'Procesando' : item.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {workspaceMessage ? (
+                <div className="entity-success" role="status">
+                  {workspaceMessage}
+                </div>
+              ) : null}
 
               <button
                 className="danger-link"

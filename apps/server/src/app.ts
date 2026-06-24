@@ -6,6 +6,7 @@ import { dashboardRouter } from './routes/dashboard.js';
 import { entitiesRouter } from './routes/entities.js';
 import { healthRouter } from './routes/health.js';
 import { setupRouter } from './routes/setup.js';
+import { workspaceRouter } from './routes/workspace.js';
 
 export function createApp() {
   const app = express();
@@ -23,6 +24,7 @@ export function createApp() {
   app.use('/api/dashboard', dashboardRouter);
   app.use('/api/health', healthRouter);
   app.use('/api/setup', setupRouter);
+  app.use('/api/workspace', workspaceRouter);
   app.use('/api', entitiesRouter);
 
   return app;

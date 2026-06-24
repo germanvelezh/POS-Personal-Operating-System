@@ -5,7 +5,8 @@ import { createSessionCookie, type AuthSession } from '../auth/session.js';
 import {
   buildEntityCollectionResponse,
   buildEntityItemResponse,
-  type EntityRepositoriesFactory
+  type EntityRepositoriesFactory,
+  type EntityWorkspaceAdapterFactory
 } from '../entities/http.js';
 
 const source = {
@@ -67,7 +68,10 @@ function createFakeRepositories() {
     }))
   };
   const configuration = {
-    get: vi.fn(async () => ({ clave: 'CLIENTE_INTERNO_ID', valor: 'CLI-INTERNAL' }))
+    get: vi.fn(async (key) => ({
+      clave: key,
+      valor: key === 'DRIVE_ROOT_FOLDER_ID' ? 'root-folder' : 'CLI-INTERNAL'
+    }))
   };
   const ideas = {
     create: vi.fn(async (body) => ({
@@ -162,6 +166,45 @@ describe('entity HTTP handlers', () => {
         naturaleza: 'empresa',
         nombre: 'Acme SAS',
         tipo_cliente: 'externo'
+      }),
+      { actor: 'Germán' }
+    );
+  });
+
+  it('adds a Drive folder when creating clients with the workspace adapter', async () => {
+    const repositories = createFakeRepositories();
+    const factory: EntityRepositoriesFactory = vi.fn(async () => repositories as never);
+    const workspaceAdapter = {
+      createDocument: vi.fn(),
+      ensureFolder: vi.fn(async () => ({
+        id: 'folder-client',
+        name: 'Cliente - Acme SAS',
+        url: 'https://drive.google.com/drive/folders/folder-client'
+      }))
+    };
+    const workspaceAdapterFactory: EntityWorkspaceAdapterFactory = vi.fn(
+      async () => workspaceAdapter
+    );
+
+    const response = await buildEntityCollectionResponse({
+      body: { nombre: 'Acme SAS' },
+      cookieHeader,
+      entity: 'clients',
+      method: 'POST',
+      repositoriesFactory: factory,
+      source,
+      workspaceAdapterFactory
+    });
+
+    expect(response.status).toBe(201);
+    expect(workspaceAdapter.ensureFolder).toHaveBeenCalledWith({
+      name: 'Cliente - Acme SAS',
+      parentId: 'root-folder'
+    });
+    expect(repositories.clients.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        drive_folder_id: 'folder-client',
+        drive_folder_url: 'https://drive.google.com/drive/folders/folder-client'
       }),
       { actor: 'Germán' }
     );

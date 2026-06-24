@@ -405,4 +405,202 @@ describe('Startup OS Personal shell', () => {
       expect.objectContaining({ credentials: 'include' })
     );
   });
+
+  it('runs workspace document actions from a project detail', async () => {
+    const user = userEvent.setup();
+    const project = {
+      cliente_id: 'CLI-1',
+      descripcion: 'Sistema ejecutivo',
+      doc_brief_id: '',
+      doc_brief_url: '',
+      drive_folder_id: 'folder-project',
+      drive_folder_url: 'https://drive.google.com/drive/folders/folder-project',
+      estado: 'activo',
+      proxima_accion: 'Cerrar alcance',
+      proyecto_id: 'PRO-1',
+      responsable: 'Germán',
+      semaforo: 'amarillo',
+      titulo: 'Proyecto A'
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url === '/api/auth/status') {
+        return {
+          ok: true,
+          json: async () => ({
+            configured: true,
+            connected: true,
+            email: 'germanvelezh@gmail.com',
+            name: 'German Velez',
+            picture: null,
+            allowedGoogleEmail: 'germanvelezh@gmail.com'
+          })
+        };
+      }
+
+      if (url === '/api/dashboard') {
+        return {
+          ok: true,
+          json: async () => emptyDashboard
+        };
+      }
+
+      if (url === '/api/projects') {
+        return {
+          ok: true,
+          json: async () => ({
+            entity: 'projects',
+            records: [project]
+          })
+        };
+      }
+
+      if (url === '/api/workspace') {
+        expect(init).toMatchObject({
+          credentials: 'include',
+          method: 'POST'
+        });
+        expect(JSON.parse(String(init?.body))).toEqual({
+          action: 'generate_project_brief',
+          entity: 'projects',
+          id: 'PRO-1'
+        });
+
+        return {
+          ok: true,
+          json: async () => ({
+            action: 'generate_project_brief',
+            document: {
+              id: 'doc-1',
+              name: 'Brief de proyecto - Proyecto A',
+              url: 'https://docs.google.com/document/d/doc-1/edit'
+            },
+            record: {
+              ...project,
+              doc_brief_id: 'doc-1',
+              doc_brief_url: 'https://docs.google.com/document/d/doc-1/edit'
+            }
+          })
+        };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    window.history.pushState({}, '', '/projects/PRO-1');
+
+    render(<App />);
+
+    expect(await screen.findByText('Proyecto A')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Generar brief/i }));
+
+    expect(await screen.findByRole('link', { name: /Brief Docs/i })).toHaveAttribute(
+      'href',
+      'https://docs.google.com/document/d/doc-1/edit'
+    );
+    expect(screen.getByText(/Documento generado/i)).toBeInTheDocument();
+  });
+
+  it('loads generated documents from the workspace API', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url === '/api/auth/status') {
+        return {
+          ok: true,
+          json: async () => ({
+            configured: true,
+            connected: true,
+            email: 'germanvelezh@gmail.com',
+            name: 'German Velez',
+            picture: null,
+            allowedGoogleEmail: 'germanvelezh@gmail.com'
+          })
+        };
+      }
+
+      if (url === '/api/workspace?view=documents') {
+        return {
+          ok: true,
+          json: async () => ({
+            documents: [
+              {
+                documento_id: 'DOC-1',
+                entidad_tipo: 'projects',
+                google_doc_url: 'https://docs.google.com/document/d/doc-1/edit',
+                tipo: 'proyecto_brief',
+                titulo: 'Brief de proyecto - Proyecto A'
+              }
+            ]
+          })
+        };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    window.history.pushState({}, '', '/documents');
+
+    render(<App />);
+
+    expect(await screen.findByText('Brief de proyecto - Proyecto A')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Abrir documento/i })).toHaveAttribute(
+      'href',
+      'https://docs.google.com/document/d/doc-1/edit'
+    );
+  });
+
+  it('generates a weekly report from automations', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url === '/api/auth/status') {
+        return {
+          ok: true,
+          json: async () => ({
+            configured: true,
+            connected: true,
+            email: 'germanvelezh@gmail.com',
+            name: 'German Velez',
+            picture: null,
+            allowedGoogleEmail: 'germanvelezh@gmail.com'
+          })
+        };
+      }
+
+      if (url === '/api/workspace') {
+        expect(JSON.parse(String(init?.body))).toEqual({
+          action: 'generate_weekly_report'
+        });
+
+        return {
+          ok: true,
+          json: async () => ({
+            action: 'generate_weekly_report',
+            document: {
+              id: 'doc-weekly',
+              name: 'Reporte semanal - 2026-06-24',
+              url: 'https://docs.google.com/document/d/doc-weekly/edit'
+            }
+          })
+        };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    window.history.pushState({}, '', '/automations');
+
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: /Generar reporte semanal/i }));
+
+    expect(await screen.findByText(/Reporte semanal generado/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Abrir reporte/i })).toHaveAttribute(
+      'href',
+      'https://docs.google.com/document/d/doc-weekly/edit'
+    );
+  });
 });

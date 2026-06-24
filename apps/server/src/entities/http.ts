@@ -9,6 +9,11 @@ import {
   isEntityRouteKey,
   type EntityRouteKey
 } from './config.js';
+import {
+  prepareClientFolderFields,
+  prepareProjectFolderFields
+} from '../workspace/actions.js';
+import type { WorkspaceAdapter } from '../workspace/googleWorkspaceAdapter.js';
 
 type EnvSource = NodeJS.ProcessEnv | Record<string, string | undefined>;
 type QueryValue = string | string[] | undefined;
@@ -24,6 +29,12 @@ export type EntityRepositoriesFactory = (
   source: EnvSource
 ) => Promise<EntityRepositories>;
 
+export type EntityWorkspaceAdapterFactory = (
+  session: AuthSession,
+  config: GoogleAuthConfig,
+  source: EnvSource
+) => Promise<WorkspaceAdapter>;
+
 type EntityRequestContext = {
   body?: unknown;
   cookieHeader: string | undefined;
@@ -32,6 +43,7 @@ type EntityRequestContext = {
   query?: Record<string, QueryValue>;
   repositoriesFactory?: EntityRepositoriesFactory;
   source?: EnvSource;
+  workspaceAdapterFactory?: EntityWorkspaceAdapterFactory;
 };
 
 type EntityItemRequestContext = EntityRequestContext & {
@@ -43,6 +55,7 @@ type ResolvedRepositories =
       error: EntityJsonResponse;
     }
   | {
+      config: GoogleAuthConfig;
       repositories: EntityRepositories;
       session: AuthSession;
     };
@@ -111,6 +124,7 @@ async function resolveRepositories({
   }
 
   return {
+    config,
     repositories: await repositoriesFactory(session, config, source),
     session
   };
@@ -180,6 +194,43 @@ async function prepareCreatePayload(
   return { payload };
 }
 
+async function applyWorkspaceCreateFields({
+  entity,
+  payload,
+  repositories,
+  session,
+  config,
+  source,
+  workspaceAdapterFactory
+}: {
+  config: GoogleAuthConfig;
+  entity: EntityRouteKey;
+  payload: Record<string, unknown>;
+  repositories: EntityRepositories;
+  session: AuthSession;
+  source: EnvSource;
+  workspaceAdapterFactory?: EntityWorkspaceAdapterFactory;
+}) {
+  if (!workspaceAdapterFactory || payload.drive_folder_id) {
+    return payload;
+  }
+
+  if (entity !== 'clients' && entity !== 'projects') {
+    return payload;
+  }
+
+  const adapter = await workspaceAdapterFactory(session, config, source);
+  const folderFields =
+    entity === 'clients'
+      ? await prepareClientFolderFields(repositories, adapter, payload)
+      : await prepareProjectFolderFields(repositories, adapter, payload);
+
+  return {
+    ...payload,
+    ...folderFields
+  };
+}
+
 function handleEntityError(error: unknown) {
   if (error instanceof ZodError) {
     return {
@@ -208,7 +259,8 @@ export async function buildEntityCollectionResponse({
   method = 'GET',
   query,
   repositoriesFactory,
-  source = process.env
+  source = process.env,
+  workspaceAdapterFactory
 }: EntityRequestContext): Promise<EntityJsonResponse> {
   const config = getEntityConfig(entity);
 
@@ -253,10 +305,20 @@ export async function buildEntityCollectionResponse({
       return prepared.error;
     }
 
+    const payload = await applyWorkspaceCreateFields({
+      config: resolved.config,
+      entity,
+      payload: prepared.payload,
+      repositories: resolved.repositories,
+      session: resolved.session,
+      source,
+      workspaceAdapterFactory
+    });
+
     return {
       body: {
         entity,
-        record: await repository.create(prepared.payload as never, { actor: 'Germán' })
+        record: await repository.create(payload as never, { actor: 'Germán' })
       },
       status: 201
     };

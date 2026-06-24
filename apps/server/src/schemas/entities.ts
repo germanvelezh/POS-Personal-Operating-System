@@ -465,7 +465,7 @@ export const relationSchema = z.object({
 
 export const configurationSchema = z.object({
   clave: requiredText,
-  valor: requiredText,
+  valor: optionalText,
   descripcion: optionalText,
   fecha_actualizacion: timestampText
 });

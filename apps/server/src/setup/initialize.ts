@@ -84,6 +84,16 @@ function createConfigRecord(clave: string, valor: string, descripcion: string, t
   };
 }
 
+function createTemplateConfigRecords(timestamp: string) {
+  return [
+    createConfigRecord('TEMPLATE_IDEA_BRIEF_ID', '', 'ID plantilla Google Docs para briefs de idea.', timestamp),
+    createConfigRecord('TEMPLATE_RESEARCH_ID', '', 'ID plantilla Google Docs para investigaciones.', timestamp),
+    createConfigRecord('TEMPLATE_PROJECT_BRIEF_ID', '', 'ID plantilla Google Docs para briefs de proyecto.', timestamp),
+    createConfigRecord('TEMPLATE_INVOICE_ID', '', 'ID plantilla Google Docs para facturas.', timestamp),
+    createConfigRecord('TEMPLATE_WEEKLY_REPORT_ID', '', 'ID plantilla Google Docs para reportes semanales.', timestamp)
+  ];
+}
+
 function findInternalClient(records: Record<string, string>[]) {
   return records.find(
     (record) =>
@@ -147,7 +157,8 @@ export async function initializeStartupOs(
     createConfigRecord('DRIVE_ROOT_FOLDER_URL', rootFolder.url, 'URL de la carpeta raíz Drive.', timestamp),
     createConfigRecord('CLIENTE_INTERNO_ID', internalClientId, 'ID del cliente interno Germán / Startup Interna.', timestamp),
     createConfigRecord('CLIENTE_INTERNO_NOMBRE', INTERNAL_CLIENT_NAME, 'Nombre del cliente interno.', timestamp),
-    createConfigRecord('SETUP_INITIALIZED_AT', timestamp, 'Última inicialización ejecutada.', timestamp)
+    createConfigRecord('SETUP_INITIALIZED_AT', timestamp, 'Última inicialización ejecutada.', timestamp),
+    ...createTemplateConfigRecords(timestamp)
   ]);
 
   await adapter.appendRecord(masterSheet.id, 'Log_Actividad', {

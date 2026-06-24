@@ -814,6 +814,46 @@ a:focus-visible {
   grid-template-columns: minmax(160px, 1fr) 110px 110px minmax(160px, 1fr);
 }
 
+.documents-table .data-row {
+  grid-template-columns: minmax(190px, 1.3fr) 130px 120px 90px 140px;
+}
+
+.automation-result {
+  display: flex;
+  min-height: 74px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid rgba(48, 209, 88, 0.18);
+  border-radius: 8px;
+  background: rgba(48, 209, 88, 0.08);
+  padding: 14px;
+}
+
+.automation-result div {
+  display: grid;
+  gap: 4px;
+}
+
+.automation-result strong {
+  color: var(--text);
+}
+
+.automation-result span {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
+.automation-list {
+  display: grid;
+  gap: 8px;
+}
+
+.automation-list .button {
+  justify-content: flex-start;
+  width: 100%;
+}
+
 .status-inline,
 .progress-cell,
 .activity-name {
@@ -1453,6 +1493,30 @@ a:focus-visible {
   font-size: 0.82rem;
   font-weight: 740;
   text-decoration: none;
+}
+
+.entity-workspace-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.entity-workspace-actions .button {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.entity-success {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  border: 1px solid rgba(48, 209, 88, 0.18);
+  border-radius: 8px;
+  background: rgba(48, 209, 88, 0.08);
+  color: var(--success);
+  padding: 0 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .modal-backdrop {

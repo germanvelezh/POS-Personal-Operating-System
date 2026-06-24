@@ -4,6 +4,7 @@ import {
   buildEntityCollectionResponse,
   buildEntityItemResponse
 } from '../entities/http.js';
+import { createGoogleWorkspaceAdapter } from '../workspace/googleWorkspaceAdapter.js';
 
 export const entitiesRouter = Router();
 
@@ -25,7 +26,9 @@ entitiesRouter.post('/:entity', async (request, response) => {
     cookieHeader: request.headers.cookie,
     entity: request.params.entity,
     method: request.method,
-    source: process.env
+    source: process.env,
+    workspaceAdapterFactory: async (session, config) =>
+      createGoogleWorkspaceAdapter(session, config)
   });
 
   response.status(payload.status).json(payload.body);

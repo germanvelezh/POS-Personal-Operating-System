@@ -169,4 +169,84 @@ describe('Startup OS Personal shell', () => {
     expect(screen.getAllByText('sheet-1').length).toBeGreaterThan(0);
     expect(screen.getAllByText('folder-1').length).toBeGreaterThan(0);
   });
+
+  it('loads and creates clients from the CRUD API', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url === '/api/auth/status') {
+        return {
+          ok: true,
+          json: async () => ({
+            configured: true,
+            connected: true,
+            email: 'germanvelezh@gmail.com',
+            name: 'German Velez',
+            picture: null,
+            allowedGoogleEmail: 'germanvelezh@gmail.com'
+          })
+        };
+      }
+
+      if (url === '/api/clients') {
+        if (init?.method === 'POST') {
+          expect(init).toMatchObject({
+            credentials: 'include',
+            method: 'POST'
+          });
+
+          return {
+            ok: true,
+            json: async () => ({
+              entity: 'clients',
+              record: {
+                cliente_id: 'CLI-2',
+                estado: 'prospecto',
+                nombre: 'Nova Labs',
+                proxima_accion: 'Enviar brief'
+              }
+            })
+          };
+        }
+
+        return {
+          ok: true,
+          json: async () => ({
+            entity: 'clients',
+            records: [
+              {
+                cliente_id: 'CLI-1',
+                estado: 'activo',
+                nombre: 'Acme SAS',
+                proxima_accion: 'Enviar propuesta'
+              }
+            ]
+          })
+        };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    window.history.pushState({}, '', '/clients');
+
+    render(<App />);
+
+    expect(await screen.findByText('Acme SAS')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Crear$/i }));
+    await user.clear(screen.getByLabelText('Nombre'));
+    await user.type(screen.getByLabelText('Nombre'), 'Nova Labs');
+    await user.type(screen.getByLabelText('Próxima acción'), 'Enviar brief');
+    await user.click(screen.getByRole('button', { name: /Guardar/i }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/clients',
+      expect.objectContaining({
+        credentials: 'include',
+        method: 'POST'
+      })
+    );
+    expect(await screen.findByText('Nova Labs')).toBeInTheDocument();
+  });
 });

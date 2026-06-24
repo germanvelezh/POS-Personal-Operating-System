@@ -2,9 +2,19 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { AppLayout } from '../components/layout/AppLayout';
 import { DashboardPage } from '../pages/DashboardPage';
+import { EntityPage } from '../pages/EntityPage';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { pageRoutes } from './routes';
+
+const crudRoutes = {
+  '/clients': 'clients',
+  '/ideas': 'ideas',
+  '/projects': 'projects',
+  '/tasks': 'tasks',
+  '/opportunities': 'opportunities',
+  '/invoices': 'invoices'
+} as const;
 
 export function App() {
   return (
@@ -17,14 +27,21 @@ export function App() {
               return null;
             }
 
-            const element =
-              route.path === '/settings' ? (
-                <SettingsPage />
-              ) : (
-                <PlaceholderPage route={route} />
-              );
+            const entity = crudRoutes[route.path as keyof typeof crudRoutes];
+            const element = entity ? (
+              <EntityPage entity={entity} route={route} />
+            ) : route.path === '/settings' ? (
+              <SettingsPage />
+            ) : (
+              <PlaceholderPage route={route} />
+            );
 
-            return <Route key={route.path} path={route.path.slice(1)} element={element} />;
+            return (
+              <Route key={route.path} path={route.path.slice(1)}>
+                <Route index element={element} />
+                {entity ? <Route path=":recordId" element={element} /> : null}
+              </Route>
+            );
           })}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

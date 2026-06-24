@@ -15,7 +15,7 @@
       "destination": "/api/auth/google-callback"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]

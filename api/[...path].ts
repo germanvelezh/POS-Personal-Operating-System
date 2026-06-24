@@ -10,6 +10,7 @@ type ApiRequest = {
   };
   method?: string;
   query?: Record<string, string | string[] | undefined>;
+  url?: string;
 };
 
 type JsonResponse = {
@@ -17,8 +18,11 @@ type JsonResponse = {
   json: (body: unknown) => void;
 };
 
-function pathSegments(query: ApiRequest['query']) {
-  const path = query?.path;
+function pathSegments(request: ApiRequest) {
+  const urlPath = request.url
+    ? new URL(request.url, 'https://startup-os.local').pathname.replace(/^\/api\/?/, '')
+    : '';
+  const path = request.query?.path ?? urlPath;
 
   return (Array.isArray(path) ? path : path ? [path] : [])
     .flatMap((segment) => segment.split('/'))
@@ -26,7 +30,7 @@ function pathSegments(query: ApiRequest['query']) {
 }
 
 export default async function handler(request: ApiRequest, response: JsonResponse) {
-  const [entity, id] = pathSegments(request.query);
+  const [entity, id] = pathSegments(request);
   const payload = id
     ? await buildEntityItemResponse({
         body: request.body,

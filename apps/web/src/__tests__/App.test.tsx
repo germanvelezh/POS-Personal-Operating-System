@@ -13,13 +13,45 @@ const disconnectedStatus = {
   allowedGoogleEmail: 'germanvelezh@gmail.com'
 };
 
+const emptyDashboard = {
+  generatedAt: '2026-06-24T00:00:00.000Z',
+  ideasByStatus: {},
+  metrics: {
+    activeProjects: 0,
+    billableInvoices: 0,
+    billableInvoiceValue: 0,
+    criticalTasks: 0,
+    funnelValue: 0,
+    openOpportunities: 0,
+    overdueInvoices: 0,
+    overdueInvoiceValue: 0,
+    redProjects: 0,
+    tasksThisWeek: 0
+  },
+  missingNextActions: {
+    count: 0,
+    items: []
+  },
+  projectTraffic: {
+    amarillo: 0,
+    rojo: 0,
+    verde: 0
+  },
+  recentActivity: [],
+  topProjects: [],
+  priorities: [],
+  funnel: [],
+  invoiceBuckets: [],
+  nextActions: []
+};
+
 describe('Startup OS Personal shell', () => {
   beforeEach(() => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => ({
+      vi.fn(async (input: RequestInfo | URL) => ({
         ok: true,
-        json: async () => disconnectedStatus
+        json: async () => (String(input) === '/api/dashboard' ? emptyDashboard : disconnectedStatus)
       }))
     );
   });
@@ -114,6 +146,13 @@ describe('Startup OS Personal shell', () => {
         };
       }
 
+      if (url === '/api/dashboard') {
+        return {
+          ok: true,
+          json: async () => emptyDashboard
+        };
+      }
+
       if (url === '/api/setup/initialize') {
         expect(init).toMatchObject({
           credentials: 'include',
@@ -189,6 +228,13 @@ describe('Startup OS Personal shell', () => {
         };
       }
 
+      if (url === '/api/dashboard') {
+        return {
+          ok: true,
+          json: async () => emptyDashboard
+        };
+      }
+
       if (url === '/api/clients') {
         if (init?.method === 'POST') {
           expect(init).toMatchObject({
@@ -248,5 +294,115 @@ describe('Startup OS Personal shell', () => {
       })
     );
     expect(await screen.findByText('Nova Labs')).toBeInTheDocument();
+  });
+
+  it('loads the executive dashboard from the dashboard API', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url === '/api/auth/status') {
+        return {
+          ok: true,
+          json: async () => ({
+            configured: true,
+            connected: true,
+            email: 'germanvelezh@gmail.com',
+            name: 'German Velez',
+            picture: null,
+            allowedGoogleEmail: 'germanvelezh@gmail.com'
+          })
+        };
+      }
+
+      if (url === '/api/dashboard') {
+        return {
+          ok: true,
+          json: async () => ({
+            ...emptyDashboard,
+            metrics: {
+              ...emptyDashboard.metrics,
+              activeProjects: 2,
+              billableInvoices: 1,
+              billableInvoiceValue: 700,
+              criticalTasks: 1,
+              funnelValue: 3000,
+              openOpportunities: 2,
+              overdueInvoices: 1,
+              overdueInvoiceValue: 500,
+              redProjects: 1,
+              tasksThisWeek: 1
+            },
+            priorities: [
+              {
+                due: 'Vencida',
+                id: 'TAR-1',
+                module: 'Tarea',
+                title: 'Llamar al cliente',
+                tone: 'danger'
+              }
+            ],
+            topProjects: [
+              {
+                deadline: '2026-06-29',
+                id: 'PRO-2',
+                state: 'activo',
+                title: 'Proyecto rojo',
+                traffic: 'rojo'
+              }
+            ],
+            funnel: [
+              {
+                count: 1,
+                stage: 'Nuevas',
+                value: 1000,
+                width: 50
+              }
+            ],
+            invoiceBuckets: [
+              {
+                count: 1,
+                label: 'Vencidas',
+                percent: 42,
+                tone: 'red',
+                value: 500
+              }
+            ],
+            missingNextActions: {
+              count: 3,
+              items: [
+                {
+                  id: 'CLI-1',
+                  module: 'Cliente',
+                  title: 'Acme SAS'
+                }
+              ]
+            },
+            recentActivity: [
+              {
+                activity: 'created',
+                date: '2026-06-24T08:00:00.000Z',
+                detail: 'created Clientes',
+                module: 'Clientes'
+              }
+            ]
+          })
+        };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    expect(await screen.findByText('Llamar al cliente')).toBeInTheDocument();
+    expect(screen.getByText('Proyecto rojo')).toBeInTheDocument();
+    expect(screen.getByText('Objetos sin próxima acción')).toBeInTheDocument();
+    expect(screen.getByText('Acme SAS')).toBeInTheDocument();
+    expect(screen.getAllByText('$ 3.000').length).toBeGreaterThan(0);
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/dashboard',
+      expect.objectContaining({ credentials: 'include' })
+    );
   });
 });

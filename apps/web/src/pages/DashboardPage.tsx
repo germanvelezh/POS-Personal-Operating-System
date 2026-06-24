@@ -1,215 +1,205 @@
 import {
+  AlertTriangle,
   CalendarDays,
   CheckCircle2,
   CircleDollarSign,
   ClipboardCheck,
   FileText,
   FolderKanban,
+  Loader2,
   ReceiptText,
   Target,
   TrendingUp,
   TriangleAlert
 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
-import { Badge } from '../components/ui/Badge';
+import { Badge, type BadgeTone } from '../components/ui/Badge';
 import { MetricCard } from '../components/ui/MetricCard';
+import {
+  emptyDashboard,
+  fetchDashboard,
+  type DashboardPayload
+} from '../services/dashboard';
 
-const metrics = [
-  {
-    label: 'Tareas críticas',
-    value: '7',
-    detail: '2 más que ayer',
-    icon: TriangleAlert,
-    tone: 'red' as const,
-    trend: 'down' as const
-  },
-  {
-    label: 'Proyectos activos',
-    value: '5',
-    detail: 'Sin cambios hoy',
-    icon: FolderKanban,
-    tone: 'blue' as const,
-    trend: 'flat' as const
-  },
-  {
-    label: 'Funnel abierto',
-    value: '$128.4K',
-    detail: '12% vs semana pasada',
-    icon: Target,
-    tone: 'green' as const,
-    trend: 'up' as const
-  },
-  {
-    label: 'Facturas vencidas',
-    value: '$9.250',
-    detail: '3 requieren acción',
-    icon: ReceiptText,
-    tone: 'red' as const,
-    trend: 'down' as const
-  },
-  {
-    label: 'Ingresos mes',
-    value: '$18.600',
-    detail: '8% vs mes pasado',
-    icon: TrendingUp,
-    tone: 'green' as const,
-    trend: 'up' as const
+type MetricTone = 'amber' | 'blue' | 'green' | 'neutral' | 'red';
+
+function formatMoney(value: number) {
+  return `$ ${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(value)}`;
+}
+
+function formatDate(value: string) {
+  if (!value) {
+    return 'Sin fecha';
   }
-];
 
-const priorities = [
-  {
-    title: 'Enviar propuesta a NovaTech',
-    module: 'Cliente',
-    due: 'Hoy',
-    tone: 'danger' as const
-  },
-  {
-    title: 'Pago de factura VENC-2025-012',
-    module: 'Factura',
-    due: 'Hoy',
-    tone: 'danger' as const
-  },
-  {
-    title: 'Revisión de contrato EcoBuild',
-    module: 'Proyecto',
-    due: 'Mañana',
-    tone: 'warning' as const
-  },
-  {
-    title: 'Seguimiento oportunidad FinData',
-    module: 'Oportunidad',
-    due: 'Mañana',
-    tone: 'warning' as const
-  },
-  {
-    title: 'Aprobación de wireframes',
-    module: 'Proyecto',
-    due: '24 may',
-    tone: 'neutral' as const
-  },
-  {
-    title: 'Investigación: IA para PMEs',
-    module: 'Investigación',
-    due: '24 may',
-    tone: 'info' as const
+  return value.slice(0, 10);
+}
+
+function generatedLabel(value: string) {
+  if (!value || value === emptyDashboard.generatedAt) {
+    return 'Datos de Google Sheets';
   }
-];
 
-const projects = [
-  {
-    project: 'Plataforma NovaTech',
-    state: 'En curso',
-    progress: 72,
-    deadline: '30 may',
-    tone: 'green'
-  },
-  {
-    project: 'App Móvil EcoBuild',
-    state: 'En curso',
-    progress: 45,
-    deadline: '12 jun',
-    tone: 'green'
-  },
-  {
-    project: 'Landing FinData',
-    state: 'En revisión',
-    progress: 60,
-    deadline: '28 may',
-    tone: 'amber'
-  },
-  {
-    project: 'Automatización Ventas',
-    state: 'En curso',
-    progress: 80,
-    deadline: '05 jun',
-    tone: 'green'
-  },
-  {
-    project: 'Rebranding Startup OS',
-    state: 'Bloqueado',
-    progress: 20,
-    deadline: '15 jun',
-    tone: 'red'
+  return `Actualizado ${formatDate(value)}`;
+}
+
+function humanize(value: string) {
+  return value.replaceAll('_', ' ').replace(/^\w/, (letter) => letter.toUpperCase());
+}
+
+function trafficClass(traffic: string) {
+  if (traffic === 'rojo') {
+    return 'red';
   }
-];
 
-const agenda = [
-  { time: '09:00', title: 'Standup del equipo', length: '30 min', type: 'meet' },
-  { time: '10:30', title: 'Revisión propuesta NovaTech', length: '60 min', type: 'doc' },
-  { time: '12:00', title: 'Almuerzo', length: '', type: 'idle' },
-  { time: '14:00', title: 'Llamada con FinData', length: '45 min', type: 'meet' },
-  { time: '15:00', title: 'Revisión de wireframes', length: '60 min', type: 'doc' },
-  { time: '16:30', title: 'Cierre de pendientes', length: '30 min', type: 'task' }
-];
-
-const funnel = [
-  { stage: 'Nuevos', count: 18, value: '$45.000', width: 100 },
-  { stage: 'Calificados', count: 12, value: '$32.000', width: 82 },
-  { stage: 'Propuesta', count: 7, value: '$21.400', width: 64 },
-  { stage: 'Negociación', count: 4, value: '$18.000', width: 47 },
-  { stage: 'Cierre', count: 2, value: '$12.000', width: 30 }
-];
-
-const invoices = [
-  { label: 'Vencidas', value: '$9.250', percent: '33%', tone: 'red' },
-  { label: 'Por vencer', value: '$8.400', percent: '30%', tone: 'amber' },
-  { label: 'Pagadas', value: '$10.200', percent: '37%', tone: 'green' }
-];
-
-const nextActions = [
-  { title: 'Preparar demo para EcoBuild', tag: 'Proyecto', done: false },
-  { title: 'Actualizar modelo financiero', tag: 'Finanzas', done: false },
-  { title: 'Publicar caso de éxito NovaTech', tag: 'Marketing', done: false },
-  { title: 'Enviar reporte semanal', tag: 'Operación', done: true },
-  { title: 'Backup de documentos críticos', tag: 'Operación', done: true }
-];
-
-const recentActivity = [
-  {
-    icon: FileText,
-    activity: 'Documento actualizado',
-    module: 'Proyectos',
-    detail: 'Plan_NovaTech.xlsx',
-    date: 'Hoy, 08:45'
-  },
-  {
-    icon: FileText,
-    activity: 'Documento creado',
-    module: 'Documentos',
-    detail: 'Propuesta_NovaTech.docx',
-    date: 'Ayer, 17:30'
-  },
-  {
-    icon: Target,
-    activity: 'Fila agregada',
-    module: 'Oportunidades',
-    detail: 'FinData - Licencias',
-    date: 'Ayer, 14:22'
-  },
-  {
-    icon: CheckCircle2,
-    activity: 'Tarea completada',
-    module: 'Tareas',
-    detail: 'Investigación: Competencia',
-    date: 'Ayer, 11:05'
+  if (traffic === 'amarillo') {
+    return 'amber';
   }
-];
+
+  if (traffic === 'verde') {
+    return 'green';
+  }
+
+  return 'blue';
+}
+
+function metricTone(value: number, dangerWhenPositive = false): MetricTone {
+  if (dangerWhenPositive && value > 0) {
+    return 'red';
+  }
+
+  if (value > 0) {
+    return 'green';
+  }
+
+  return 'blue';
+}
+
+function EmptyRows({ label }: { label: string }) {
+  return (
+    <div className="dashboard-empty">
+      <span>{label}</span>
+    </div>
+  );
+}
 
 export function DashboardPage() {
+  const [dashboard, setDashboard] = useState<DashboardPayload>(emptyDashboard);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDashboard() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const payload = await fetchDashboard();
+
+        if (!cancelled) {
+          setDashboard(payload);
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar.');
+          setDashboard(emptyDashboard);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadDashboard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const metrics = useMemo(
+    () => [
+      {
+        detail: `${dashboard.metrics.tasksThisWeek} esta semana`,
+        icon: TriangleAlert,
+        label: 'Tareas críticas',
+        tone: metricTone(dashboard.metrics.criticalTasks, true),
+        trend: dashboard.metrics.criticalTasks > 0 ? ('down' as const) : ('flat' as const),
+        value: String(dashboard.metrics.criticalTasks)
+      },
+      {
+        detail: `${dashboard.metrics.redProjects} en rojo`,
+        icon: FolderKanban,
+        label: 'Proyectos activos',
+        tone: metricTone(dashboard.metrics.activeProjects),
+        trend: 'flat' as const,
+        value: String(dashboard.metrics.activeProjects)
+      },
+      {
+        detail: `${dashboard.metrics.openOpportunities} oportunidades abiertas`,
+        icon: Target,
+        label: 'Funnel abierto',
+        tone: 'green' as MetricTone,
+        trend: dashboard.metrics.funnelValue > 0 ? ('up' as const) : ('flat' as const),
+        value: formatMoney(dashboard.metrics.funnelValue)
+      },
+      {
+        detail: `${dashboard.metrics.overdueInvoices} requieren acción`,
+        icon: ReceiptText,
+        label: 'Facturas vencidas',
+        tone: metricTone(dashboard.metrics.overdueInvoices, true),
+        trend: dashboard.metrics.overdueInvoices > 0 ? ('down' as const) : ('flat' as const),
+        value: formatMoney(dashboard.metrics.overdueInvoiceValue)
+      },
+      {
+        detail: `${dashboard.metrics.billableInvoices} por emitir`,
+        icon: TrendingUp,
+        label: 'Por facturar',
+        tone: 'amber' as MetricTone,
+        trend: dashboard.metrics.billableInvoiceValue > 0 ? ('up' as const) : ('flat' as const),
+        value: formatMoney(dashboard.metrics.billableInvoiceValue)
+      }
+    ],
+    [dashboard]
+  );
+  const invoiceTotal = dashboard.invoiceBuckets.reduce((sum, bucket) => sum + bucket.value, 0);
+
   return (
     <section className="dashboard-page">
       <div className="hero-row">
         <div>
           <h1>Hoy</h1>
-          <p>Lunes, 22 de junio de 2026</p>
+          <p>{generatedLabel(dashboard.generatedAt)}</p>
         </div>
         <div className="hero-actions">
-          <Badge dot tone="danger">7 críticas</Badge>
-          <Badge dot tone="warning">3 facturas vencidas</Badge>
-          <Badge dot tone="info">Google pendiente</Badge>
+          {loading ? (
+            <Badge dot tone="info">Cargando Google Sheets</Badge>
+          ) : (
+            <>
+              <Badge dot tone={dashboard.metrics.criticalTasks > 0 ? 'danger' : 'success'}>
+                {dashboard.metrics.criticalTasks} críticas
+              </Badge>
+              <Badge dot tone={dashboard.metrics.overdueInvoices > 0 ? 'warning' : 'success'}>
+                {dashboard.metrics.overdueInvoices} facturas vencidas
+              </Badge>
+              <Badge dot tone={dashboard.missingNextActions.count > 0 ? 'info' : 'success'}>
+                {dashboard.missingNextActions.count} sin próxima acción
+              </Badge>
+            </>
+          )}
         </div>
       </div>
+
+      {error ? (
+        <div className="settings-alert" role="alert">
+          <AlertTriangle aria-hidden="true" size={16} />
+          {error}
+        </div>
+      ) : null}
 
       <div className="metric-grid executive-metrics">
         {metrics.map((metric) => (
@@ -232,17 +222,21 @@ export function DashboardPage() {
               <h2>Prioridades</h2>
               <p>Siguiente ventana operativa.</p>
             </div>
-            <button className="link-button" type="button">Ver todas</button>
+            {loading ? <Loader2 aria-hidden="true" className="spin-icon" size={16} /> : null}
           </div>
           <div className="priority-table">
-            {priorities.map((priority) => (
-              <div className="priority-row" key={priority.title}>
-                <span className={`priority-dot priority-${priority.tone}`} />
-                <strong>{priority.title}</strong>
-                <Badge tone={priority.tone}>{priority.module}</Badge>
-                <time>{priority.due}</time>
-              </div>
-            ))}
+            {dashboard.priorities.length > 0 ? (
+              dashboard.priorities.map((priority) => (
+                <div className="priority-row" key={`${priority.module}-${priority.id}`}>
+                  <span className={`priority-dot priority-${priority.tone}`} />
+                  <strong>{priority.title}</strong>
+                  <Badge tone={priority.tone}>{priority.module}</Badge>
+                  <time>{priority.due}</time>
+                </div>
+              ))
+            ) : (
+              <EmptyRows label="Sin prioridades críticas" />
+            )}
           </div>
         </article>
 
@@ -250,33 +244,34 @@ export function DashboardPage() {
           <div className="panel-header">
             <div>
               <h2>Proyectos activos</h2>
-              <p>Semáforo y avance de entregables.</p>
+              <p>Semáforo y vencimientos visibles.</p>
             </div>
-            <button className="link-button" type="button">Ver todos</button>
+            <Badge tone={dashboard.projectTraffic.rojo > 0 ? 'danger' : 'success'}>
+              {dashboard.projectTraffic.rojo} rojo
+            </Badge>
           </div>
           <div className="data-table project-table">
             <div className="data-row data-head">
               <span>Proyecto</span>
               <span>Estado</span>
-              <span>Progreso</span>
-              <span>Deadline</span>
+              <span>Semáforo</span>
+              <span>Fecha</span>
             </div>
-            {projects.map((project) => (
-              <div className="data-row" key={project.project}>
-                <strong>{project.project}</strong>
-                <span className="status-inline">
-                  <i className={`traffic-dot traffic-${project.tone}`} />
-                  {project.state}
-                </span>
-                <span className="progress-cell">
-                  <i>
-                    <b style={{ width: `${project.progress}%` }} />
-                  </i>
-                  {project.progress}%
-                </span>
-                <time>{project.deadline}</time>
-              </div>
-            ))}
+            {dashboard.topProjects.length > 0 ? (
+              dashboard.topProjects.map((project) => (
+                <div className="data-row" key={project.id}>
+                  <strong>{project.title}</strong>
+                  <span>{humanize(project.state)}</span>
+                  <span className="status-inline">
+                    <i className={`traffic-dot traffic-${trafficClass(project.traffic)}`} />
+                    {humanize(project.traffic)}
+                  </span>
+                  <time>{formatDate(project.deadline)}</time>
+                </div>
+              ))
+            ) : (
+              <EmptyRows label="Sin proyectos activos" />
+            )}
           </div>
         </article>
 
@@ -285,19 +280,23 @@ export function DashboardPage() {
             <div className="panel-header">
               <div>
                 <h2>Agenda de hoy</h2>
-                <p>Bloques que compiten por atención.</p>
+                <p>Tareas con vencimiento cercano.</p>
               </div>
               <CalendarDays aria-hidden="true" size={18} />
             </div>
             <div className="agenda-list">
-              {agenda.map((item) => (
-                <div className="agenda-item" key={`${item.time}-${item.title}`}>
-                  <time>{item.time}</time>
-                  <span className={`agenda-dot agenda-${item.type}`} />
-                  <strong>{item.title}</strong>
-                  <small>{item.length}</small>
-                </div>
-              ))}
+              {dashboard.nextActions.length > 0 ? (
+                dashboard.nextActions.slice(0, 6).map((item) => (
+                  <div className="agenda-item" key={`${item.module}-${item.id}`}>
+                    <time>{item.module}</time>
+                    <span className="agenda-dot agenda-task" />
+                    <strong>{item.title}</strong>
+                    <small>{item.done ? 'Hecha' : 'Abierta'}</small>
+                  </div>
+                ))
+              ) : (
+                <EmptyRows label="Sin acciones próximas" />
+              )}
             </div>
           </article>
 
@@ -305,20 +304,26 @@ export function DashboardPage() {
             <div className="panel-header">
               <div>
                 <h2>Siguientes acciones</h2>
-                <p>Objetos con próximo paso claro.</p>
+                <p>Objetos sin próxima acción</p>
               </div>
-              <button className="link-button" type="button">Ver todas</button>
+              <Badge tone={dashboard.missingNextActions.count > 0 ? 'warning' : 'success'}>
+                {dashboard.missingNextActions.count}
+              </Badge>
             </div>
             <div className="next-action-list">
-              {nextActions.map((action) => (
-                <label className="next-action" key={action.title}>
-                  <input defaultChecked={action.done} type="checkbox" />
-                  <span>
-                    <strong>{action.title}</strong>
-                    <small>{action.tag}</small>
-                  </span>
-                </label>
-              ))}
+              {dashboard.missingNextActions.items.length > 0 ? (
+                dashboard.missingNextActions.items.map((item) => (
+                  <label className="next-action" key={`${item.module}-${item.id}`}>
+                    <input readOnly type="checkbox" />
+                    <span>
+                      <strong>{item.title}</strong>
+                      <small>{item.module}</small>
+                    </span>
+                  </label>
+                ))
+              ) : (
+                <EmptyRows label="Todo tiene próximo paso" />
+              )}
             </div>
           </article>
         </aside>
@@ -329,21 +334,25 @@ export function DashboardPage() {
               <h2>Funnel abierto</h2>
               <p>Valor comercial por etapa.</p>
             </div>
-            <button className="link-button" type="button">Ver pipeline</button>
+            <Badge tone="success">{dashboard.metrics.openOpportunities} abiertas</Badge>
           </div>
           <div className="funnel-list">
-            {funnel.map((stage) => (
-              <div className="funnel-row" key={stage.stage}>
-                <span className="funnel-bar" style={{ width: `${stage.width}%` }} />
-                <strong>{stage.stage}</strong>
-                <span>{stage.count}</span>
-                <b>{stage.value}</b>
-              </div>
-            ))}
+            {dashboard.funnel.length > 0 ? (
+              dashboard.funnel.map((stage) => (
+                <div className="funnel-row" key={stage.stage}>
+                  <span className="funnel-bar" style={{ width: `${stage.width}%` }} />
+                  <strong>{stage.stage}</strong>
+                  <span>{stage.count}</span>
+                  <b>{formatMoney(stage.value)}</b>
+                </div>
+              ))
+            ) : (
+              <EmptyRows label="Sin oportunidades abiertas" />
+            )}
           </div>
           <div className="panel-total">
             <span>Total pipeline</span>
-            <strong>$128.400</strong>
+            <strong>{formatMoney(dashboard.metrics.funnelValue)}</strong>
           </div>
         </article>
 
@@ -353,35 +362,40 @@ export function DashboardPage() {
               <h2>Facturas</h2>
               <p>Cobranza y vencimientos.</p>
             </div>
-            <button className="link-button" type="button">Ver facturas</button>
+            <Badge tone={dashboard.metrics.overdueInvoices > 0 ? 'danger' : 'success'}>
+              {dashboard.metrics.overdueInvoices} vencidas
+            </Badge>
           </div>
           <div className="invoice-widget">
-            <div className="invoice-ring" aria-label="Total facturas $27.850">
+            <div className="invoice-ring" aria-label={`Total facturas ${formatMoney(invoiceTotal)}`}>
               <CircleDollarSign aria-hidden="true" size={22} />
-              <strong>$27.850</strong>
+              <strong>{formatMoney(invoiceTotal)}</strong>
               <span>Total</span>
             </div>
             <div className="invoice-list">
-              {invoices.map((invoice) => (
-                <div className="invoice-row" key={invoice.label}>
-                  <span className={`traffic-dot traffic-${invoice.tone}`} />
-                  <strong>{invoice.label}</strong>
-                  <span>{invoice.value}</span>
-                  <small>{invoice.percent}</small>
-                </div>
-              ))}
+              {dashboard.invoiceBuckets.length > 0 ? (
+                dashboard.invoiceBuckets.map((invoice) => (
+                  <div className="invoice-row" key={invoice.label}>
+                    <span className={`traffic-dot traffic-${invoice.tone}`} />
+                    <strong>{invoice.label}</strong>
+                    <span>{formatMoney(invoice.value)}</span>
+                    <small>{invoice.percent}%</small>
+                  </div>
+                ))
+              ) : (
+                <EmptyRows label="Sin facturas" />
+              )}
             </div>
           </div>
-          <button className="danger-link" type="button">3 vencidas</button>
         </article>
 
         <article className="panel cockpit-activity">
           <div className="panel-header">
             <div>
               <h2>Actividad reciente</h2>
-              <p>Registro operativo listo para Log_Actividad.</p>
+              <p>Últimos movimientos en Log_Actividad.</p>
             </div>
-            <button className="link-button" type="button">Ver todo</button>
+            <CheckCircle2 aria-hidden="true" size={18} />
           </div>
           <div className="data-table activity-table">
             <div className="data-row data-head">
@@ -390,21 +404,21 @@ export function DashboardPage() {
               <span>Detalle</span>
               <span>Fecha</span>
             </div>
-            {recentActivity.map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <div className="data-row" key={`${item.activity}-${item.detail}`}>
+            {dashboard.recentActivity.length > 0 ? (
+              dashboard.recentActivity.map((item) => (
+                <div className="data-row" key={item.id || `${item.activity}-${item.date}`}>
                   <strong className="activity-name">
-                    <Icon aria-hidden="true" size={15} />
+                    <FileText aria-hidden="true" size={15} />
                     {item.activity}
                   </strong>
                   <span>{item.module}</span>
                   <span>{item.detail}</span>
-                  <time>{item.date}</time>
+                  <time>{formatDate(item.date)}</time>
                 </div>
-              );
-            })}
+              ))
+            ) : (
+              <EmptyRows label="Sin movimientos todavía" />
+            )}
           </div>
         </article>
 
@@ -421,8 +435,8 @@ export function DashboardPage() {
             <button type="button">Proyecto</button>
             <button type="button">Oportunidad</button>
             <button type="button">Factura</button>
-            <button type="button">Documento</button>
-            <button type="button">Investigación</button>
+            <button type="button">Cliente</button>
+            <button type="button">Idea</button>
           </div>
         </article>
       </div>

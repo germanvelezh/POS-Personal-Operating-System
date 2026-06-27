@@ -45,11 +45,16 @@ const workspaceActionSchema = z.object({
   action: z.enum([
     'create_client_folder',
     'create_project_structure',
+    'detect_overdue_invoices',
+    'detect_overdue_tasks',
     'generate_idea_brief',
     'generate_invoice',
     'generate_project_brief',
     'generate_research_doc',
-    'generate_weekly_report'
+    'generate_weekly_report',
+    'list_missing_next_actions',
+    'recalculate_idea_scores',
+    'recalculate_project_traffic'
   ]),
   entity: z.string().optional(),
   id: z.string().optional()

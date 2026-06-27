@@ -3,11 +3,16 @@ import type { EntityKey, EntityRecord } from './entities';
 export type WorkspaceAction =
   | 'create_client_folder'
   | 'create_project_structure'
+  | 'detect_overdue_invoices'
+  | 'detect_overdue_tasks'
   | 'generate_idea_brief'
   | 'generate_invoice'
   | 'generate_project_brief'
   | 'generate_research_doc'
-  | 'generate_weekly_report';
+  | 'generate_weekly_report'
+  | 'list_missing_next_actions'
+  | 'recalculate_idea_scores'
+  | 'recalculate_project_traffic';
 
 export type WorkspaceDocument = {
   id: string;
@@ -15,11 +20,28 @@ export type WorkspaceDocument = {
   url: string;
 };
 
+export type WorkspaceActionItem = {
+  dueDate?: string;
+  entity?: string;
+  id?: string;
+  module?: string;
+  priority?: string;
+  reason?: string;
+  score?: number;
+  state?: string;
+  title?: string;
+  traffic?: string;
+  updated?: boolean;
+  value?: number;
+};
+
 export type WorkspaceActionResponse = {
   action: WorkspaceAction;
   document?: WorkspaceDocument;
   folder?: WorkspaceDocument;
+  items?: WorkspaceActionItem[];
   record?: EntityRecord;
+  summary?: Record<string, boolean | number | string | null | undefined>;
 };
 
 export type WorkspaceDocumentRecord = {

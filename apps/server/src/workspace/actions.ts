@@ -1,14 +1,20 @@
 import type { EntityRepositories } from '../repositories/entityRepositories.js';
+import { calculateIdeaPriorityScore } from '../schemas/entities.js';
 import type { WorkspaceAdapter, DriveResource } from './googleWorkspaceAdapter.js';
 
 export type WorkspaceAction =
   | 'create_client_folder'
   | 'create_project_structure'
+  | 'detect_overdue_invoices'
+  | 'detect_overdue_tasks'
   | 'generate_idea_brief'
   | 'generate_invoice'
   | 'generate_project_brief'
   | 'generate_research_doc'
-  | 'generate_weekly_report';
+  | 'generate_weekly_report'
+  | 'list_missing_next_actions'
+  | 'recalculate_idea_scores'
+  | 'recalculate_project_traffic';
 
 type WorkspaceActionInput = {
   action: WorkspaceAction;
@@ -23,6 +29,7 @@ type WorkspaceActionContext = {
 };
 
 const ACTOR = 'Germán';
+const DAY_MS = 24 * 60 * 60 * 1000;
 const PROJECT_SUBFOLDERS = [
   '01 Brief',
   '02 Investigacion',
@@ -30,6 +37,16 @@ const PROJECT_SUBFOLDERS = [
   '04 Facturacion',
   '05 Cierre y Aprendizajes'
 ];
+const OPEN_TASK_STATES = new Set(['backlog', 'pendiente', 'en_progreso', 'bloqueada', 'en_revision']);
+const OPEN_OPPORTUNITY_STATES = new Set([
+  'nueva',
+  'calificada',
+  'en_descubrimiento',
+  'propuesta_pendiente',
+  'propuesta_enviada',
+  'negociacion'
+]);
+const OPEN_INVOICE_STATES = new Set(['por_facturar', 'borrador', 'facturada', 'vencida']);
 
 function asText(value: unknown) {
   return String(value ?? '').trim();
@@ -39,8 +56,34 @@ function dateKey(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
+function dayStamp(value: unknown) {
+  const text = asText(value).slice(0, 10);
+
+  if (!text) {
+    return null;
+  }
+
+  const stamp = Date.parse(`${text}T00:00:00.000Z`);
+
+  return Number.isFinite(stamp) ? stamp : null;
+}
+
+function todayStamp(now: Date) {
+  return Date.parse(`${dateKey(now)}T00:00:00.000Z`);
+}
+
 function cleanName(value: string) {
   return value.replace(/[\\/:*?"<>|#%{}[\]^~]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function optionalNumber(value: unknown) {
+  if (asText(value) === '') {
+    return null;
+  }
+
+  const numberValue = Number(value);
+
+  return Number.isFinite(numberValue) ? numberValue : null;
 }
 
 function formatMoney(value: unknown, currency: unknown) {
@@ -70,6 +113,22 @@ function documentContent(title: string, placeholders: Record<string, string>) {
   ];
 
   return `${lines.join('\n')}\n`;
+}
+
+function isOpenTask(task: Record<string, unknown>) {
+  return OPEN_TASK_STATES.has(asText(task.estado));
+}
+
+function isOverdue(value: unknown, today: number) {
+  const due = dayStamp(value);
+
+  return due !== null && due < today;
+}
+
+function isDueSoon(value: unknown, today: number) {
+  const due = dayStamp(value);
+
+  return due !== null && due >= today && due <= today + 7 * DAY_MS;
 }
 
 async function optionalConfig(repositories: EntityRepositories, key: string) {
@@ -519,11 +578,337 @@ async function generateWeeklyReport({ adapter, now, repositories }: WorkspaceAct
   return { document, documentRecord };
 }
 
+async function recalculateIdeaScores({ repositories }: WorkspaceActionContext) {
+  const ideas = await repositories.ideas.list();
+  let scoredIdeas = 0;
+  let updatedIdeas = 0;
+  const items = [];
+
+  for (const idea of ideas) {
+    const record = idea as Record<string, unknown>;
+    const id = asText(record.idea_id);
+    const impacto = optionalNumber(record.impacto);
+    const dineroPotencial = optionalNumber(record.dinero_potencial);
+    const urgencia = optionalNumber(record.urgencia);
+    const esfuerzo = optionalNumber(record.esfuerzo);
+
+    if (
+      !id ||
+      impacto === null ||
+      dineroPotencial === null ||
+      urgencia === null ||
+      esfuerzo === null
+    ) {
+      continue;
+    }
+
+    const score = calculateIdeaPriorityScore({
+      dinero_potencial: dineroPotencial,
+      esfuerzo,
+      impacto,
+      urgencia
+    });
+    const previousScore = optionalNumber(record.score_prioridad);
+    const changed = previousScore !== score;
+
+    scoredIdeas += 1;
+
+    if (changed) {
+      await repositories.ideas.update(id, { score_prioridad: score }, { actor: ACTOR });
+      updatedIdeas += 1;
+    }
+
+    items.push({
+      id,
+      previousScore,
+      score,
+      title: asText(record.titulo) || id,
+      updated: changed
+    });
+  }
+
+  return {
+    items,
+    summary: {
+      scoredIdeas,
+      totalIdeas: ideas.length,
+      updatedIdeas
+    }
+  };
+}
+
+function projectTraffic(
+  project: Record<string, unknown>,
+  tasks: Array<Record<string, unknown>>,
+  today: number
+) {
+  const hasCriticalOverdueTask = tasks.some(
+    (task) => asText(task.prioridad) === 'critica' && isOverdue(task.fecha_vencimiento, today)
+  );
+  const hasCriticalBlockedTask = tasks.some(
+    (task) => asText(task.prioridad) === 'critica' && asText(task.estado) === 'bloqueada'
+  );
+  const lacksNextAction = !asText(project.proxima_accion);
+
+  if (hasCriticalOverdueTask) {
+    return { reason: 'Tarea critica vencida', traffic: 'rojo' as const };
+  }
+
+  if (hasCriticalBlockedTask) {
+    return { reason: 'Tarea critica bloqueada', traffic: 'rojo' as const };
+  }
+
+  if (lacksNextAction) {
+    return { reason: 'Proyecto activo sin proxima accion', traffic: 'rojo' as const };
+  }
+
+  if (tasks.some((task) => isOverdue(task.fecha_vencimiento, today))) {
+    return { reason: 'Tareas vencidas no criticas', traffic: 'amarillo' as const };
+  }
+
+  if (isDueSoon(project.fecha_fin_estimada, today)) {
+    return { reason: 'Vencimiento proximo', traffic: 'amarillo' as const };
+  }
+
+  return { reason: 'Sin bloqueos ni vencimientos relevantes', traffic: 'verde' as const };
+}
+
+async function recalculateProjectTraffic({ now, repositories }: WorkspaceActionContext) {
+  const [projects, tasks] = await Promise.all([
+    repositories.projects.list(),
+    repositories.tasks.list()
+  ]);
+  const today = todayStamp(now());
+  const openTasks = tasks
+    .map((task) => task as Record<string, unknown>)
+    .filter(isOpenTask);
+  const items = [];
+  const summary = {
+    activeProjects: 0,
+    amarillo: 0,
+    rojo: 0,
+    updatedProjects: 0,
+    verde: 0
+  };
+
+  for (const project of projects) {
+    const record = project as Record<string, unknown>;
+
+    if (asText(record.estado) !== 'activo') {
+      continue;
+    }
+
+    const id = asText(record.proyecto_id);
+    const projectTasks = openTasks.filter((task) => asText(task.proyecto_id) === id);
+    const traffic = projectTraffic(record, projectTasks, today);
+    const previousTraffic = asText(record.semaforo);
+    const changed = id && previousTraffic !== traffic.traffic;
+
+    summary.activeProjects += 1;
+    summary[traffic.traffic] += 1;
+
+    if (changed) {
+      await repositories.projects.update(id, { semaforo: traffic.traffic }, { actor: ACTOR });
+      summary.updatedProjects += 1;
+    }
+
+    items.push({
+      id,
+      previousTraffic,
+      reason: traffic.reason,
+      title: asText(record.titulo) || id,
+      traffic: traffic.traffic,
+      updated: Boolean(changed)
+    });
+  }
+
+  return { items, summary };
+}
+
+async function detectOverdueTasks({ now, repositories }: WorkspaceActionContext) {
+  const today = todayStamp(now());
+  const tasks = await repositories.tasks.list();
+  const overdueTasks = tasks
+    .map((task) => task as Record<string, unknown>)
+    .filter((task) => isOpenTask(task) && isOverdue(task.fecha_vencimiento, today))
+    .sort((a, b) => (dayStamp(a.fecha_vencimiento) ?? 0) - (dayStamp(b.fecha_vencimiento) ?? 0));
+  const items = overdueTasks.map((task) => ({
+    dueDate: asText(task.fecha_vencimiento),
+    id: asText(task.tarea_id),
+    priority: asText(task.prioridad),
+    projectId: asText(task.proyecto_id),
+    state: asText(task.estado),
+    title: asText(task.titulo) || asText(task.tarea_id)
+  }));
+
+  return {
+    items,
+    summary: {
+      criticalOverdueTasks: overdueTasks.filter((task) => asText(task.prioridad) === 'critica')
+        .length,
+      overdueTasks: overdueTasks.length
+    }
+  };
+}
+
+async function detectOverdueInvoices({ now, repositories }: WorkspaceActionContext) {
+  const today = todayStamp(now());
+  const invoices = await repositories.invoices.list();
+  const overdueInvoices = invoices
+    .map((invoice) => invoice as Record<string, unknown>)
+    .filter(
+      (invoice) =>
+        OPEN_INVOICE_STATES.has(asText(invoice.estado)) &&
+        isOverdue(invoice.fecha_vencimiento, today)
+    )
+    .sort((a, b) => (dayStamp(a.fecha_vencimiento) ?? 0) - (dayStamp(b.fecha_vencimiento) ?? 0));
+  let updatedInvoices = 0;
+  const items = [];
+
+  for (const invoice of overdueInvoices) {
+    const id = asText(invoice.factura_id);
+    const state = asText(invoice.estado);
+    const shouldUpdate = id && state !== 'vencida';
+
+    if (shouldUpdate) {
+      await repositories.invoices.update(id, { estado: 'vencida' }, { actor: ACTOR });
+      updatedInvoices += 1;
+    }
+
+    items.push({
+      dueDate: asText(invoice.fecha_vencimiento),
+      id,
+      state: shouldUpdate ? 'vencida' : state,
+      title: asText(invoice.concepto) || id,
+      updated: Boolean(shouldUpdate),
+      value: Number(invoice.valor ?? 0)
+    });
+  }
+
+  return {
+    items,
+    summary: {
+      overdueInvoiceValue: overdueInvoices.reduce((sum, invoice) => {
+        const value = Number(invoice.valor ?? 0);
+
+        return Number.isFinite(value) ? sum + value : sum;
+      }, 0),
+      overdueInvoices: overdueInvoices.length,
+      updatedInvoices
+    }
+  };
+}
+
+async function listMissingNextActions({ repositories }: WorkspaceActionContext) {
+  const [clients, ideas, projects, opportunities] = await Promise.all([
+    repositories.clients.list(),
+    repositories.ideas.list(),
+    repositories.projects.list(),
+    repositories.opportunities.list()
+  ]);
+  const items = [
+    ...clients
+      .map((client) => client as Record<string, unknown>)
+      .filter((client) => asText(client.estado) !== 'inactivo' && !asText(client.proxima_accion))
+      .map((client) => ({
+        entity: 'clients',
+        id: asText(client.cliente_id),
+        module: 'Cliente',
+        state: asText(client.estado),
+        title: asText(client.nombre) || asText(client.cliente_id)
+      })),
+    ...ideas
+      .map((idea) => idea as Record<string, unknown>)
+      .filter(
+        (idea) =>
+          !['archivada', 'descartada'].includes(asText(idea.estado)) &&
+          !asText(idea.proxima_accion)
+      )
+      .map((idea) => ({
+        entity: 'ideas',
+        id: asText(idea.idea_id),
+        module: 'Idea',
+        state: asText(idea.estado),
+        title: asText(idea.titulo) || asText(idea.idea_id)
+      })),
+    ...projects
+      .map((project) => project as Record<string, unknown>)
+      .filter(
+        (project) =>
+          ['activo', 'planeado', 'bloqueado', 'en_revision'].includes(asText(project.estado)) &&
+          !asText(project.proxima_accion)
+      )
+      .map((project) => ({
+        entity: 'projects',
+        id: asText(project.proyecto_id),
+        module: 'Proyecto',
+        state: asText(project.estado),
+        title: asText(project.titulo) || asText(project.proyecto_id)
+      })),
+    ...opportunities
+      .map((opportunity) => opportunity as Record<string, unknown>)
+      .filter(
+        (opportunity) =>
+          OPEN_OPPORTUNITY_STATES.has(asText(opportunity.estado)) &&
+          !asText(opportunity.proxima_accion)
+      )
+      .map((opportunity) => ({
+        entity: 'opportunities',
+        id: asText(opportunity.oportunidad_id),
+        module: 'Oportunidad',
+        state: asText(opportunity.estado),
+        title: asText(opportunity.titulo) || asText(opportunity.oportunidad_id)
+      }))
+  ];
+
+  return {
+    items,
+    summary: {
+      missingNextActions: items.length
+    }
+  };
+}
+
 export async function runWorkspaceAction(input: WorkspaceActionInput, context: WorkspaceActionContext) {
   if (input.action === 'generate_weekly_report') {
     return {
       action: input.action,
       ...(await generateWeeklyReport(context))
+    };
+  }
+
+  if (input.action === 'recalculate_idea_scores') {
+    return {
+      action: input.action,
+      ...(await recalculateIdeaScores(context))
+    };
+  }
+
+  if (input.action === 'recalculate_project_traffic') {
+    return {
+      action: input.action,
+      ...(await recalculateProjectTraffic(context))
+    };
+  }
+
+  if (input.action === 'detect_overdue_tasks') {
+    return {
+      action: input.action,
+      ...(await detectOverdueTasks(context))
+    };
+  }
+
+  if (input.action === 'detect_overdue_invoices') {
+    return {
+      action: input.action,
+      ...(await detectOverdueInvoices(context))
+    };
+  }
+
+  if (input.action === 'list_missing_next_actions') {
+    return {
+      action: input.action,
+      ...(await listMissingNextActions(context))
     };
   }
 

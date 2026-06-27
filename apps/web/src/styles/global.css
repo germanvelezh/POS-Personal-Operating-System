@@ -830,6 +830,11 @@ a:focus-visible {
   padding: 14px;
 }
 
+.automation-result > svg {
+  flex: 0 0 auto;
+  color: #1f9d49;
+}
+
 .automation-result div {
   display: grid;
   gap: 4px;
@@ -852,6 +857,114 @@ a:focus-visible {
 .automation-list .button {
   justify-content: flex-start;
   width: 100%;
+}
+
+.automation-list-rich {
+  gap: 10px;
+}
+
+.automation-card-button {
+  align-items: flex-start;
+  min-height: 76px;
+  padding: 13px 14px;
+  text-align: left;
+}
+
+.automation-card-button > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.automation-button-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.automation-button-copy strong {
+  color: var(--text);
+  font-size: 0.88rem;
+  line-height: 1.2;
+}
+
+.automation-button-copy small {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 650;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.automation-result-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.automation-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: 8px;
+}
+
+.automation-summary-metric {
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 10px;
+}
+
+.automation-summary-metric strong {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.automation-summary-metric span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 760;
+}
+
+.automation-item-list {
+  display: grid;
+  gap: 8px;
+}
+
+.automation-item-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.automation-item-row div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.automation-item-row strong,
+.automation-item-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-item-row strong {
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.automation-item-row span {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 700;
 }
 
 .status-inline,

@@ -603,4 +603,66 @@ describe('Startup OS Personal shell', () => {
       'https://docs.google.com/document/d/doc-weekly/edit'
     );
   });
+
+  it('runs phase 6 manual automations from the automations page', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url === '/api/auth/status') {
+        return {
+          ok: true,
+          json: async () => ({
+            configured: true,
+            connected: true,
+            email: 'germanvelezh@gmail.com',
+            name: 'German Velez',
+            picture: null,
+            allowedGoogleEmail: 'germanvelezh@gmail.com'
+          })
+        };
+      }
+
+      if (url === '/api/workspace') {
+        expect(JSON.parse(String(init?.body))).toEqual({
+          action: 'recalculate_idea_scores'
+        });
+
+        return {
+          ok: true,
+          json: async () => ({
+            action: 'recalculate_idea_scores',
+            items: [
+              {
+                id: 'IDE-1',
+                score: 4.15,
+                title: 'Growth engine'
+              }
+            ],
+            summary: {
+              scoredIdeas: 2,
+              updatedIdeas: 1
+            }
+          })
+        };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    window.history.pushState({}, '', '/automations');
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole('button', { name: /Recalcular scores de ideas/i })
+    ).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Detectar facturas vencidas/i })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: /Recalcular scores de ideas/i }));
+
+    expect(await screen.findByText(/Scores de ideas recalculados/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 actualizadas/i)).toBeInTheDocument();
+    expect(screen.getByText(/Growth engine/i)).toBeInTheDocument();
+  });
 });

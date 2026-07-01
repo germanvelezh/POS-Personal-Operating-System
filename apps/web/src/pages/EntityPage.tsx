@@ -36,6 +36,7 @@ type FieldConfig = {
   label: string;
   name: string;
   options?: Array<{ label: string; value: string }>;
+  relation?: 'clients';
   required?: boolean;
   type?: FieldType;
 };
@@ -302,7 +303,7 @@ const entityPageConfigs: Record<EntityKey, EntityPageConfig> = {
         required: true,
         type: 'select'
       },
-      { label: 'Cliente ID', name: 'cliente_id' },
+      { label: 'Cliente', name: 'cliente_id', relation: 'clients', type: 'select' },
       { label: 'Responsable', name: 'responsable', required: true },
       { label: 'Objetivo', name: 'objetivo', type: 'textarea' },
       { label: 'Próxima acción', name: 'proxima_accion' }
@@ -676,13 +677,16 @@ function getWorkspaceActions(entity: EntityKey, record: EntityRecord): Workspace
 function EntityField({
   field,
   onChange,
+  options,
   value
 }: {
   field: FieldConfig;
   onChange: (field: string, value: string) => void;
+  options?: Array<{ label: string; value: string }>;
   value: string;
 }) {
   const id = `entity-field-${field.name}`;
+  const selectOptions = options ?? field.options ?? [];
 
   if (field.type === 'select') {
     return (
@@ -695,7 +699,7 @@ function EntityField({
           value={value}
         >
           <option value="">Seleccionar</option>
-          {field.options?.map((option) => (
+          {selectOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
@@ -751,9 +755,11 @@ export function EntityPage({ entity, route }: EntityPageProps) {
   const [formValues, setFormValues] = useState<Record<string, string>>(() =>
     createInitialForm(config)
   );
+  const [clientOptions, setClientOptions] = useState<Array<{ label: string; value: string }>>([]);
   const [workspaceAction, setWorkspaceAction] = useState<WorkspaceAction | null>(null);
   const [workspaceMessage, setWorkspaceMessage] = useState<string | null>(null);
 
+  const needsClientOptions = config.fields.some((field) => field.relation === 'clients');
   const activeStatus = config.views.find((view) => view.label === activeView)?.status;
   const filteredRecords = useMemo(
     () => filterRecords(records, config, search, activeStatus),
@@ -802,6 +808,45 @@ export function EntityPage({ entity, route }: EntityPageProps) {
       cancelled = true;
     };
   }, [entity]);
+
+  useEffect(() => {
+    if (!needsClientOptions) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadClientOptions() {
+      try {
+        const clients = await fetchEntityRecords('clients');
+        const nextOptions = clients
+          .filter((client) => ['activo', 'prospecto'].includes(String(client.estado ?? '')))
+          .filter((client) => client.cliente_id && client.nombre)
+          .map((client) => ({
+            label: String(client.nombre),
+            value: String(client.cliente_id)
+          }));
+
+        if (!cancelled) {
+          setClientOptions(nextOptions);
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(
+            loadError instanceof Error
+              ? `No se pudo cargar la lista de clientes. ${loadError.message}`
+              : 'No se pudo cargar la lista de clientes.'
+          );
+        }
+      }
+    }
+
+    void loadClientOptions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [needsClientOptions]);
 
   useEffect(() => {
     setSelectedId(routeRecordId ?? null);
@@ -1102,6 +1147,7 @@ export function EntityPage({ entity, route }: EntityPageProps) {
                     field={field}
                     key={field.name}
                     onChange={handleFieldChange}
+                    options={field.relation === 'clients' ? clientOptions : undefined}
                     value={formValues[field.name] ?? ''}
                   />
                 ))}

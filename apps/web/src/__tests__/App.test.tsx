@@ -354,6 +354,101 @@ describe('Startup OS Personal shell', () => {
     expect(await screen.findByText('Nova Labs')).toBeInTheDocument();
   });
 
+  it('lets projects select an active or prospect client instead of typing a client ID', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url === '/api/auth/status') {
+        return {
+          ok: true,
+          json: async () => ({
+            configured: true,
+            connected: true,
+            email: 'germanvelezh@gmail.com',
+            name: 'German Velez',
+            picture: null,
+            allowedGoogleEmail: 'germanvelezh@gmail.com'
+          })
+        };
+      }
+
+      if (url === '/api/projects') {
+        if (init?.method === 'POST') {
+          expect(JSON.parse(String(init.body))).toMatchObject({
+            cliente_id: 'CLI-ACTIVE',
+            titulo: 'Nuevo proyecto ejecutivo'
+          });
+
+          return {
+            ok: true,
+            json: async () => ({
+              entity: 'projects',
+              record: {
+                cliente_id: 'CLI-ACTIVE',
+                estado: 'planeado',
+                proyecto_id: 'PRO-2',
+                semaforo: 'verde',
+                titulo: 'Nuevo proyecto ejecutivo'
+              }
+            })
+          };
+        }
+
+        return {
+          ok: true,
+          json: async () => ({
+            entity: 'projects',
+            records: []
+          })
+        };
+      }
+
+      if (url === '/api/clients') {
+        return {
+          ok: true,
+          json: async () => ({
+            entity: 'clients',
+            records: [
+              { cliente_id: 'CLI-ACTIVE', estado: 'activo', nombre: 'Acme SAS' },
+              { cliente_id: 'CLI-PROSPECT', estado: 'prospecto', nombre: 'Nova Labs' },
+              { cliente_id: 'CLI-INACTIVE', estado: 'inactivo', nombre: 'Dormant Co' }
+            ]
+          })
+        };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    window.history.pushState({}, '', '/projects');
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Proyectos' })).toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: /^Crear$/i })[0] as HTMLElement);
+
+    const clientSelect = await screen.findByRole('combobox', { name: 'Cliente' });
+
+    expect(screen.queryByLabelText('Cliente ID')).not.toBeInTheDocument();
+    expect(clientSelect).toHaveTextContent('Acme SAS');
+    expect(clientSelect).toHaveTextContent('Nova Labs');
+    expect(clientSelect).not.toHaveTextContent('Dormant Co');
+
+    await user.selectOptions(clientSelect, 'CLI-ACTIVE');
+    await user.type(screen.getByLabelText('Título'), 'Nuevo proyecto ejecutivo');
+    await user.click(screen.getByRole('button', { name: /Guardar/i }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/projects',
+      expect.objectContaining({
+        credentials: 'include',
+        method: 'POST'
+      })
+    );
+    expect(await screen.findByText('Nuevo proyecto ejecutivo')).toBeInTheDocument();
+  });
+
   it('loads the executive dashboard from the dashboard API', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);

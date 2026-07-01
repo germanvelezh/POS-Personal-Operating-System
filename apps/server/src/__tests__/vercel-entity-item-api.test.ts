@@ -15,9 +15,13 @@ const env = {
 describe('Vercel entity item API route', () => {
   it('serves /api/:entity/:id as JSON instead of falling through to static 404', async () => {
     const previousEnv = { ...process.env };
-    const routePath = fileURLToPath(new URL('../../api/[entity]/[id].ts', import.meta.url));
+    const routePath = fileURLToPath(new URL('../../api/clients/[id].ts', import.meta.url));
+    const conflictingCatchAllPath = fileURLToPath(
+      new URL('../../api/[...path].ts', import.meta.url)
+    );
 
     expect(existsSync(routePath)).toBe(true);
+    expect(existsSync(conflictingCatchAllPath)).toBe(false);
 
     Object.assign(process.env, env);
 

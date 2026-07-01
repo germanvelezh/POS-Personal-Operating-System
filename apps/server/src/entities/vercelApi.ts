@@ -1,5 +1,9 @@
-import { buildEntityItemResponse } from '../../src/entities/http.js';
-import { createGoogleWorkspaceAdapter } from '../../src/workspace/googleWorkspaceAdapter.js';
+import {
+  buildEntityCollectionResponse,
+  buildEntityItemResponse
+} from './http.js';
+import type { EntityRouteKey } from './config.js';
+import { createGoogleWorkspaceAdapter } from '../workspace/googleWorkspaceAdapter.js';
 
 type ApiRequest = {
   body?: unknown;
@@ -28,9 +32,33 @@ function pathSegments(request: ApiRequest) {
   return urlPath.split('/').filter(Boolean);
 }
 
-export default async function handler(request: ApiRequest, response: JsonResponse) {
-  const [entityFromPath, idFromPath] = pathSegments(request);
-  const entity = singleQueryValue(request.query?.entity) ?? entityFromPath ?? '';
+export async function handleEntityCollectionApiRequest(
+  entity: EntityRouteKey,
+  request: ApiRequest,
+  response: JsonResponse
+) {
+  const payload = await buildEntityCollectionResponse({
+    body: request.body,
+    cookieHeader: request.headers?.cookie,
+    entity,
+    method: request.method,
+    query: request.query,
+    source: process.env,
+    workspaceAdapterFactory:
+      request.method === 'POST'
+        ? async (session, config) => createGoogleWorkspaceAdapter(session, config)
+        : undefined
+  });
+
+  response.status(payload.status).json(payload.body);
+}
+
+export async function handleEntityItemApiRequest(
+  entity: EntityRouteKey,
+  request: ApiRequest,
+  response: JsonResponse
+) {
+  const [, idFromPath] = pathSegments(request);
   const id = singleQueryValue(request.query?.id) ?? idFromPath;
   const shouldAttachWorkspaceAdapter = request.method === 'PUT' || request.method === 'PATCH';
   const payload = await buildEntityItemResponse({

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, vi } from 'vitest';
 
@@ -447,6 +447,240 @@ describe('Startup OS Personal shell', () => {
       })
     );
     expect(await screen.findByText('Nuevo proyecto ejecutivo')).toBeInTheDocument();
+  });
+
+  it('uses client selectors in idea, opportunity and invoice forms', async () => {
+    const cases = [
+      {
+        createTitle: 'Idea de expansión',
+        entity: 'ideas',
+        path: '/ideas',
+        requiredField: 'Descripción',
+        requiredValue: 'Validar nuevo servicio con cliente activo',
+        titleField: 'Título'
+      },
+      {
+        createTitle: 'Oportunidad consultoría',
+        entity: 'opportunities',
+        path: '/opportunities',
+        titleField: 'Título'
+      },
+      {
+        createTitle: 'Factura implementación',
+        entity: 'invoices',
+        path: '/invoices',
+        requiredField: 'Valor',
+        requiredValue: '2500000',
+        titleField: 'Concepto'
+      }
+    ];
+
+    for (const item of cases) {
+      const user = userEvent.setup();
+      const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+
+        if (url === '/api/auth/status') {
+          return {
+            ok: true,
+            json: async () => ({
+              configured: true,
+              connected: true,
+              email: 'germanvelezh@gmail.com',
+              name: 'German Velez',
+              picture: null,
+              allowedGoogleEmail: 'germanvelezh@gmail.com'
+            })
+          };
+        }
+
+        if (url === `/api/${item.entity}`) {
+          if (init?.method === 'POST') {
+            expect(JSON.parse(String(init.body))).toMatchObject({
+              cliente_id: 'CLI-ACTIVE'
+            });
+
+            return {
+              ok: true,
+              json: async () => ({
+                entity: item.entity,
+                record: {
+                  cliente_id: 'CLI-ACTIVE',
+                  concepto: item.createTitle,
+                  estado: item.entity === 'invoices' ? 'por_facturar' : 'capturada',
+                  factura_id: 'FAC-2',
+                  idea_id: 'IDE-2',
+                  oportunidad_id: 'OPP-2',
+                  titulo: item.createTitle,
+                  valor: item.requiredValue
+                }
+              })
+            };
+          }
+
+          return {
+            ok: true,
+            json: async () => ({
+              entity: item.entity,
+              records: []
+            })
+          };
+        }
+
+        if (url === '/api/clients') {
+          return {
+            ok: true,
+            json: async () => ({
+              entity: 'clients',
+              records: [
+                { cliente_id: 'CLI-ACTIVE', estado: 'activo', nombre: 'Acme SAS' },
+                { cliente_id: 'CLI-PROSPECT', estado: 'prospecto', nombre: 'Nova Labs' },
+                { cliente_id: 'CLI-INACTIVE', estado: 'inactivo', nombre: 'Dormant Co' }
+              ]
+            })
+          };
+        }
+
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      window.history.pushState({}, '', item.path);
+
+      const { unmount } = render(<App />);
+      const headingName =
+        item.entity === 'invoices'
+          ? 'Facturas'
+          : item.entity === 'ideas'
+            ? 'Ideas'
+            : 'Oportunidades';
+
+      await screen.findByRole('heading', { name: headingName });
+      await user.click(screen.getAllByRole('button', { name: /^Crear$/i })[0] as HTMLElement);
+
+      const clientSelect = await screen.findByRole('combobox', { name: 'Cliente' });
+
+      expect(screen.queryByLabelText('Cliente ID')).not.toBeInTheDocument();
+      expect(clientSelect).toHaveTextContent('Acme SAS');
+      expect(clientSelect).toHaveTextContent('Nova Labs');
+      expect(clientSelect).not.toHaveTextContent('Dormant Co');
+
+      await user.selectOptions(clientSelect, 'CLI-ACTIVE');
+      await user.type(screen.getByLabelText(item.titleField), item.createTitle);
+
+      if (item.requiredField && item.requiredValue) {
+        await user.type(screen.getByLabelText(item.requiredField), item.requiredValue);
+      }
+
+      await user.click(screen.getByRole('button', { name: /Guardar/i }));
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        `/api/${item.entity}`,
+        expect.objectContaining({
+          credentials: 'include',
+          method: 'POST'
+        })
+      );
+
+      unmount();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('lets tasks select an open project instead of typing a project ID', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url === '/api/auth/status') {
+        return {
+          ok: true,
+          json: async () => ({
+            configured: true,
+            connected: true,
+            email: 'germanvelezh@gmail.com',
+            name: 'German Velez',
+            picture: null,
+            allowedGoogleEmail: 'germanvelezh@gmail.com'
+          })
+        };
+      }
+
+      if (url === '/api/tasks') {
+        if (init?.method === 'POST') {
+          expect(JSON.parse(String(init.body))).toMatchObject({
+            proyecto_id: 'PRO-ACTIVE',
+            titulo: 'Preparar kickoff'
+          });
+
+          return {
+            ok: true,
+            json: async () => ({
+              entity: 'tasks',
+              record: {
+                estado: 'pendiente',
+                prioridad: 'media',
+                proyecto_id: 'PRO-ACTIVE',
+                tarea_id: 'TAR-2',
+                titulo: 'Preparar kickoff'
+              }
+            })
+          };
+        }
+
+        return {
+          ok: true,
+          json: async () => ({
+            entity: 'tasks',
+            records: []
+          })
+        };
+      }
+
+      if (url === '/api/projects') {
+        return {
+          ok: true,
+          json: async () => ({
+            entity: 'projects',
+            records: [
+              { estado: 'activo', proyecto_id: 'PRO-ACTIVE', titulo: 'Implementación Acme' },
+              { estado: 'planeado', proyecto_id: 'PRO-PLANNED', titulo: 'Diagnóstico Nova' },
+              { estado: 'cerrado', proyecto_id: 'PRO-CLOSED', titulo: 'Proyecto cerrado' }
+            ]
+          })
+        };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    window.history.pushState({}, '', '/tasks');
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Tareas' })).toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: /^Crear$/i })[0] as HTMLElement);
+
+    const projectSelect = await screen.findByRole('combobox', { name: 'Proyecto' });
+
+    expect(screen.queryByLabelText('Proyecto ID')).not.toBeInTheDocument();
+    expect(projectSelect).toHaveTextContent('Implementación Acme');
+    expect(projectSelect).toHaveTextContent('Diagnóstico Nova');
+    expect(projectSelect).not.toHaveTextContent('Proyecto cerrado');
+
+    await user.selectOptions(projectSelect, 'PRO-ACTIVE');
+    await user.type(screen.getByLabelText('Título'), 'Preparar kickoff');
+    await user.click(screen.getByRole('button', { name: /Guardar/i }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/tasks',
+      expect.objectContaining({
+        credentials: 'include',
+        method: 'POST'
+      })
+    );
+    const createdTaskRow = screen.getByText('Preparar kickoff').closest('.entity-row') as HTMLElement;
+
+    expect(within(createdTaskRow).getByText('PRO-ACTIVE')).toBeInTheDocument();
   });
 
   it('loads the executive dashboard from the dashboard API', async () => {

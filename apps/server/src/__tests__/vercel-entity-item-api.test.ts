@@ -19,7 +19,7 @@ describe('Vercel entity item API route', () => {
     const conflictingDynamicItemPath = fileURLToPath(
       new URL('../../api/[entity]/[id].ts', import.meta.url)
     );
-    const vercelConfigPath = fileURLToPath(new URL('../../../../vercel.json', import.meta.url));
+    const vercelConfigPath = fileURLToPath(new URL('../../vercel.json', import.meta.url));
     const vercelConfig = JSON.parse(readFileSync(vercelConfigPath, 'utf8')) as {
       rewrites?: Array<{ destination: string; source: string }>;
     };

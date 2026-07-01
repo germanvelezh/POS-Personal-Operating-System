@@ -15,6 +15,30 @@
       "destination": "/api/auth/google-callback"
     },
     {
+      "source": "/api/clients/:id",
+      "destination": "/api/[...path]?path=clients/:id"
+    },
+    {
+      "source": "/api/ideas/:id",
+      "destination": "/api/[...path]?path=ideas/:id"
+    },
+    {
+      "source": "/api/projects/:id",
+      "destination": "/api/[...path]?path=projects/:id"
+    },
+    {
+      "source": "/api/tasks/:id",
+      "destination": "/api/[...path]?path=tasks/:id"
+    },
+    {
+      "source": "/api/opportunities/:id",
+      "destination": "/api/[...path]?path=opportunities/:id"
+    },
+    {
+      "source": "/api/invoices/:id",
+      "destination": "/api/[...path]?path=invoices/:id"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

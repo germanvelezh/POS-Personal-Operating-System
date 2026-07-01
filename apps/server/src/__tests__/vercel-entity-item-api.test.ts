@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -15,13 +15,21 @@ const env = {
 describe('Vercel entity item API route', () => {
   it('serves /api/:entity/:id as JSON instead of falling through to static 404', async () => {
     const previousEnv = { ...process.env };
-    const routePath = fileURLToPath(new URL('../../api/clients/[id].ts', import.meta.url));
-    const conflictingCatchAllPath = fileURLToPath(
-      new URL('../../api/[...path].ts', import.meta.url)
+    const routePath = fileURLToPath(new URL('../../api/[...path].ts', import.meta.url));
+    const conflictingDynamicItemPath = fileURLToPath(
+      new URL('../../api/[entity]/[id].ts', import.meta.url)
     );
+    const vercelConfigPath = fileURLToPath(new URL('../../../../vercel.json', import.meta.url));
+    const vercelConfig = JSON.parse(readFileSync(vercelConfigPath, 'utf8')) as {
+      rewrites?: Array<{ destination: string; source: string }>;
+    };
 
     expect(existsSync(routePath)).toBe(true);
-    expect(existsSync(conflictingCatchAllPath)).toBe(false);
+    expect(existsSync(conflictingDynamicItemPath)).toBe(false);
+    expect(vercelConfig.rewrites).toContainEqual({
+      destination: '/api/[...path]?path=clients/:id',
+      source: '/api/clients/:id'
+    });
 
     Object.assign(process.env, env);
 
@@ -44,8 +52,7 @@ describe('Vercel entity item API route', () => {
           headers: {},
           method: 'PUT',
           query: {
-            entity: 'clients',
-            id: 'CLI-20260624-C2HN'
+            path: 'clients/CLI-20260624-C2HN'
           },
           url: '/api/clients/CLI-20260624-C2HN'
         },

@@ -64,7 +64,7 @@ describe('Startup OS Personal shell', () => {
   it('renders the executive cockpit navigation and setup actions', async () => {
     render(<App />);
 
-    expect(await screen.findByText('Google no conectado')).toBeInTheDocument();
+    expect((await screen.findAllByText('Google no conectado')).length).toBeGreaterThan(0);
     expect(screen.getByText('Startup OS Personal')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Dashboard/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Clientes/i })).toBeInTheDocument();
@@ -106,14 +106,72 @@ describe('Startup OS Personal shell', () => {
     render(<App />);
 
     expect((await screen.findAllByText('Google conectado')).length).toBeGreaterThan(0);
-    expect(screen.getByText('germanvelezh@gmail.com')).toBeInTheDocument();
+    expect(screen.getAllByText('germanvelezh@gmail.com').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Google no conectado')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /Reconectar Google/i }).length).toBeGreaterThan(0);
+  });
+
+  it('refreshes Google status when initialization requires reconnecting Google', async () => {
+    const user = userEvent.setup();
+    let authStatusCalls = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url === '/api/auth/status') {
+        authStatusCalls += 1;
+
+        return {
+          ok: true,
+          json: async () =>
+            authStatusCalls === 1
+              ? {
+                  configured: true,
+                  connected: true,
+                  email: 'germanvelezh@gmail.com',
+                  name: 'German Velez',
+                  picture: null,
+                  allowedGoogleEmail: 'germanvelezh@gmail.com'
+                }
+              : disconnectedStatus
+        };
+      }
+
+      if (url === '/api/setup/initialize') {
+        expect(init).toMatchObject({
+          credentials: 'include',
+          method: 'POST'
+        });
+
+        return {
+          ok: false,
+          json: async () => ({
+            error: 'google_reauth_required',
+            message:
+              'La sesión de Google expiró o fue revocada. Reconecta Google y vuelve a inicializar el sistema.'
+          })
+        };
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    window.history.pushState({}, '', '/settings');
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Google conectado' })).toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: /Inicializar sistema/i })[0] as HTMLElement);
+
+    expect(await screen.findByText(/La sesión de Google expiró/i)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Google no conectado' })).toBeInTheDocument();
+    expect(authStatusCalls).toBe(2);
   });
 
   it('opens polished quick-create options from the global button', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    expect(await screen.findByText('Google no conectado')).toBeInTheDocument();
+    expect((await screen.findAllByText('Google no conectado')).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: /Crear rapido/i }));
 
     expect(screen.getByRole('dialog', { name: /Crear rapido/i })).toBeInTheDocument();

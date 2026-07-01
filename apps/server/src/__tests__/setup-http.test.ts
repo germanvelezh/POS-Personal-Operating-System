@@ -94,4 +94,28 @@ describe('setup initialize HTTP response', () => {
       internalClientId: expect.stringMatching(/^CLI-/)
     });
   });
+
+  it('clears the Google session when initialization receives invalid_grant', async () => {
+    const adapter = createAdapter();
+    adapter.findDriveFolderByName = vi.fn(async () => {
+      throw new Error('invalid_grant');
+    });
+    const adapterFactory = vi.fn(() => adapter);
+
+    const response = await buildSetupInitializeResponse({
+      adapterFactory,
+      cookieHeader: createConnectedCookie(),
+      method: 'POST',
+      source: env
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({
+      error: 'google_reauth_required',
+      message:
+        'La sesión de Google expiró o fue revocada. Reconecta Google y vuelve a inicializar el sistema.'
+    });
+    expect(response.setCookie).toContain('pos_session=;');
+    expect(response.setCookie).toContain('Max-Age=0');
+  });
 });

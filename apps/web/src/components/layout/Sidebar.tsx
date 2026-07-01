@@ -1,9 +1,50 @@
 import { NavLink } from 'react-router-dom';
-import { ChevronDown, CloudOff, Grid2X2, UserRound } from 'lucide-react';
+import { ChevronDown, Cloud, CloudOff, Grid2X2, UserRound } from 'lucide-react';
 
 import { navItems } from '../../app/navigation';
+import type { GoogleAuthStatus } from '../../services/googleAuth';
 
-export function Sidebar() {
+type SidebarProps = {
+  googleStatus: GoogleAuthStatus;
+  googleStatusLoading: boolean;
+};
+
+function getGoogleCard(status: GoogleAuthStatus, loading: boolean) {
+  if (loading) {
+    return {
+      action: 'Conectar Google',
+      detail: 'Validando sesión de Google.',
+      icon: CloudOff,
+      title: 'Verificando Google',
+      tone: 'neutral'
+    };
+  }
+
+  if (status.connected) {
+    return {
+      action: 'Reconectar Google',
+      detail: status.email ?? 'Sheets, Drive y Docs listos.',
+      icon: Cloud,
+      title: 'Google conectado',
+      tone: 'success'
+    };
+  }
+
+  return {
+    action: 'Conectar Google',
+    detail: status.configured
+      ? 'Conecta Sheets, Drive y Docs.'
+      : 'Configura OAuth en Vercel.',
+    icon: CloudOff,
+    title: status.configured ? 'Google no conectado' : 'Google sin configurar',
+    tone: 'warning'
+  };
+}
+
+export function Sidebar({ googleStatus, googleStatusLoading }: SidebarProps) {
+  const googleCard = getGoogleCard(googleStatus, googleStatusLoading);
+  const GoogleIcon = googleCard.icon;
+
   return (
     <aside className="sidebar" aria-label="Navegación principal">
       <div className="brand-block">
@@ -38,16 +79,20 @@ export function Sidebar() {
       </nav>
 
       <div className="sidebar-google-card">
-        <span className="google-card-icon">
-          <CloudOff aria-hidden="true" size={18} />
+        <span
+          className={`google-card-icon ${
+            googleCard.tone === 'success' ? 'google-card-icon-success' : ''
+          }`}
+        >
+          <GoogleIcon aria-hidden="true" size={18} />
         </span>
         <div>
-          <p>Google no conectado</p>
-          <small>Conecta Sheets, Drive y Docs.</small>
+          <p>{googleCard.title}</p>
+          <small>{googleCard.detail}</small>
         </div>
-        <button className="button button-quiet" type="button">
-          Conectar Google
-        </button>
+        <a className="button button-quiet" href="/auth/google">
+          {googleCard.action}
+        </a>
       </div>
 
       <div className="sidebar-footer">

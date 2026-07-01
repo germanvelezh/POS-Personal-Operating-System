@@ -196,6 +196,11 @@ a:focus-visible {
   color: var(--blue);
 }
 
+.google-card-icon-success {
+  background: rgba(48, 209, 88, 0.12);
+  color: #1f9d49;
+}
+
 .sidebar-google-card p,
 .sidebar-footer p {
   color: var(--text);

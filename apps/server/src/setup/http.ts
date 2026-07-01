@@ -1,7 +1,11 @@
 import { ZodError } from 'zod';
 
 import { getGoogleAuthConfig, type GoogleAuthConfig } from '../auth/config.js';
-import { getSessionFromCookieHeader, type AuthSession } from '../auth/session.js';
+import {
+  createClearSessionCookie,
+  getSessionFromCookieHeader,
+  type AuthSession
+} from '../auth/session.js';
 import { createGoogleWorkspaceSetupAdapter } from './googleWorkspaceAdapter.js';
 import {
   initializeStartupOs,
@@ -13,6 +17,7 @@ type EnvSource = NodeJS.ProcessEnv | Record<string, string | undefined>;
 export type SetupJsonResponse = {
   status: number;
   body: unknown;
+  setCookie?: string;
 };
 
 export type SetupInitializeContext = {
@@ -24,6 +29,25 @@ export type SetupInitializeContext = {
   method?: string;
   source?: EnvSource;
 };
+
+function isInvalidGrantError(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const candidate = error as {
+    message?: unknown;
+    response?: {
+      data?: {
+        error?: unknown;
+      };
+    };
+  };
+  const message = typeof candidate.message === 'string' ? candidate.message : '';
+  const googleError = candidate.response?.data?.error;
+
+  return message.includes('invalid_grant') || googleError === 'invalid_grant';
+}
 
 export async function buildSetupInitializeResponse({
   adapterFactory = createGoogleWorkspaceSetupAdapter,
@@ -74,6 +98,18 @@ export async function buildSetupInitializeResponse({
       body: await initializeStartupOs(adapterFactory(session, config))
     };
   } catch (error) {
+    if (isInvalidGrantError(error)) {
+      return {
+        status: 401,
+        setCookie: createClearSessionCookie(config),
+        body: {
+          error: 'google_reauth_required',
+          message:
+            'La sesión de Google expiró o fue revocada. Reconecta Google y vuelve a inicializar el sistema.'
+        }
+      };
+    }
+
     return {
       status: 500,
       body: {

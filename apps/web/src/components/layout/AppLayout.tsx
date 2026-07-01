@@ -58,6 +58,7 @@ export function AppLayout() {
       setSetupError(
         error instanceof Error ? error.message : 'No se pudo inicializar el sistema.'
       );
+      await refreshGoogleStatus();
     } finally {
       setSetupPending(false);
     }
@@ -65,7 +66,7 @@ export function AppLayout() {
 
   return (
     <div className="app-shell">
-      <Sidebar />
+      <Sidebar googleStatus={googleStatus} googleStatusLoading={googleStatusLoading} />
       <div className="app-main">
         <Topbar
           googleStatus={googleStatus}

@@ -12,6 +12,10 @@ setupRouter.post('/initialize', async (request, response, next) => {
       source: process.env
     });
 
+    if (payload.setCookie) {
+      response.setHeader('Set-Cookie', payload.setCookie);
+    }
+
     response.status(payload.status).json(payload.body);
   } catch (error) {
     next(error);

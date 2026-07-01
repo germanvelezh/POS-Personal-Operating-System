@@ -53,7 +53,9 @@ entitiesRouter.put('/:entity/:id', async (request, response) => {
     entity: request.params.entity,
     id: request.params.id,
     method: request.method,
-    source: process.env
+    source: process.env,
+    workspaceAdapterFactory: async (session, config) =>
+      createGoogleWorkspaceAdapter(session, config)
   });
 
   response.status(payload.status).json(payload.body);
@@ -66,7 +68,9 @@ entitiesRouter.patch('/:entity/:id', async (request, response) => {
     entity: request.params.entity,
     id: request.params.id,
     method: request.method,
-    source: process.env
+    source: process.env,
+    workspaceAdapterFactory: async (session, config) =>
+      createGoogleWorkspaceAdapter(session, config)
   });
 
   response.status(payload.status).json(payload.body);

@@ -32,6 +32,8 @@ function pathSegments(request: ApiRequest) {
 
 export default async function handler(request: ApiRequest, response: JsonResponse) {
   const [entity, id] = pathSegments(request);
+  const shouldAttachWorkspaceAdapter =
+    request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH';
   const payload = id
     ? await buildEntityItemResponse({
         body: request.body,
@@ -39,7 +41,10 @@ export default async function handler(request: ApiRequest, response: JsonRespons
         entity: entity ?? '',
         id,
         method: request.method,
-        source: process.env
+        source: process.env,
+        workspaceAdapterFactory: shouldAttachWorkspaceAdapter
+          ? async (session, config) => createGoogleWorkspaceAdapter(session, config)
+          : undefined
       })
     : await buildEntityCollectionResponse({
         body: request.body,
@@ -48,10 +53,9 @@ export default async function handler(request: ApiRequest, response: JsonRespons
         method: request.method,
         query: request.query,
         source: process.env,
-        workspaceAdapterFactory:
-          request.method === 'POST'
-            ? async (session, config) => createGoogleWorkspaceAdapter(session, config)
-            : undefined
+        workspaceAdapterFactory: shouldAttachWorkspaceAdapter
+          ? async (session, config) => createGoogleWorkspaceAdapter(session, config)
+          : undefined
       });
 
   response.status(payload.status).json(payload.body);

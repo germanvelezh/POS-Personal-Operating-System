@@ -281,4 +281,56 @@ describe('entity HTTP handlers', () => {
     );
     expect(repositories.clients.delete).toHaveBeenCalledWith('CLI-1', { actor: 'Germán' });
   });
+
+  it('adds a Drive folder when updating old clients without one', async () => {
+    const repositories = createFakeRepositories();
+    repositories.clients.get = vi.fn(async (id) => ({
+      cliente_id: id,
+      drive_folder_id: '',
+      drive_folder_url: '',
+      estado: 'activo',
+      nombre: 'Cliente viejo'
+    }));
+    const factory: EntityRepositoriesFactory = vi.fn(async () => repositories as never);
+    const workspaceAdapter = {
+      createDocument: vi.fn(),
+      ensureFolder: vi.fn(async () => ({
+        id: 'folder-client',
+        name: 'Cliente - Cliente viejo actualizado',
+        url: 'https://drive.google.com/drive/folders/folder-client'
+      }))
+    };
+    const workspaceAdapterFactory: EntityWorkspaceAdapterFactory = vi.fn(
+      async () => workspaceAdapter
+    );
+    const request = {
+      body: { nombre: 'Cliente viejo actualizado' },
+      cookieHeader,
+      entity: 'clients',
+      id: 'CLI-OLD',
+      method: 'PUT',
+      repositoriesFactory: factory,
+      source,
+      workspaceAdapterFactory
+    } as Parameters<typeof buildEntityItemResponse>[0] & {
+      workspaceAdapterFactory: EntityWorkspaceAdapterFactory;
+    };
+
+    const response = await buildEntityItemResponse(request);
+
+    expect(response.status).toBe(200);
+    expect(workspaceAdapter.ensureFolder).toHaveBeenCalledWith({
+      name: 'Cliente - Cliente viejo actualizado',
+      parentId: 'root-folder'
+    });
+    expect(repositories.clients.update).toHaveBeenCalledWith(
+      'CLI-OLD',
+      expect.objectContaining({
+        drive_folder_id: 'folder-client',
+        drive_folder_url: 'https://drive.google.com/drive/folders/folder-client',
+        nombre: 'Cliente viejo actualizado'
+      }),
+      { actor: 'Germán' }
+    );
+  });
 });

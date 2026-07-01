@@ -22,10 +22,11 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
+    const statusText = [response.status, response.statusText].filter(Boolean).join(' ');
     const message =
       payload && typeof payload === 'object' && 'message' in payload
         ? String(payload.message)
-        : 'No se pudo completar la operación.';
+        : `No se pudo completar la operación. HTTP ${statusText}`;
 
     throw new Error(message);
   }

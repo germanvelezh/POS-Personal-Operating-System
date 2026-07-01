@@ -231,6 +231,62 @@ async function applyWorkspaceCreateFields({
   };
 }
 
+function hasDriveFolder(record: Record<string, unknown>) {
+  return Boolean(String(record.drive_folder_id ?? '').trim());
+}
+
+async function applyWorkspaceUpdateFields({
+  config,
+  entity,
+  id,
+  payload,
+  repositories,
+  session,
+  source,
+  workspaceAdapterFactory
+}: {
+  config: GoogleAuthConfig;
+  entity: EntityRouteKey;
+  id: string;
+  payload: Record<string, unknown>;
+  repositories: EntityRepositories;
+  session: AuthSession;
+  source: EnvSource;
+  workspaceAdapterFactory?: EntityWorkspaceAdapterFactory;
+}) {
+  if (!workspaceAdapterFactory || payload.drive_folder_id) {
+    return payload;
+  }
+
+  if (entity !== 'clients' && entity !== 'projects') {
+    return payload;
+  }
+
+  const routeConfig = entityRouteConfigs[entity];
+  const repository = repositories[routeConfig.repositoryKey];
+  const current = await repository.get(id);
+  const currentRecord = current as Record<string, unknown>;
+
+  if (hasDriveFolder(currentRecord)) {
+    return payload;
+  }
+
+  const adapter = await workspaceAdapterFactory(session, config, source);
+  const folderPayload = {
+    ...currentRecord,
+    ...payload
+  };
+  const folderFields =
+    entity === 'clients'
+      ? await prepareClientFolderFields(repositories, adapter, folderPayload)
+      : await prepareProjectFolderFields(repositories, adapter, folderPayload);
+
+  return {
+    ...payload,
+    ...folderFields
+  };
+}
+
 function handleEntityError(error: unknown) {
   if (error instanceof ZodError) {
     return {
@@ -334,11 +390,12 @@ export async function buildEntityItemResponse({
   id,
   method = 'GET',
   repositoriesFactory,
-  source = process.env
+  source = process.env,
+  workspaceAdapterFactory
 }: EntityItemRequestContext): Promise<EntityJsonResponse> {
   const config = getEntityConfig(entity);
 
-  if (!config) {
+  if (!config || !isEntityRouteKey(entity)) {
     return jsonError(404, 'entity_not_found', `Entidad no soportada: ${entity}.`);
   }
 
@@ -383,10 +440,21 @@ export async function buildEntityItemResponse({
       };
     }
 
+    const payload = await applyWorkspaceUpdateFields({
+      config: resolved.config,
+      entity,
+      id,
+      payload: asRecord(body),
+      repositories: resolved.repositories,
+      session: resolved.session,
+      source,
+      workspaceAdapterFactory
+    });
+
     return {
       body: {
         entity,
-        record: await repository.update(id, asRecord(body) as never, { actor: 'Germán' })
+        record: await repository.update(id, payload as never, { actor: 'Germán' })
       },
       status: 200
     };
